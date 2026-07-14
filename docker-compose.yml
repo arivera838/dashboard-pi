@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    image: dashboard-pi:latest
+    container_name: dashboard-pi-service
+    ports:
+      - "8080:8080"
+    volumes:
+      # Opcional: Montajes de lectura de hardware si corre en un host Linux/Raspberry real
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    restart: unless-stopped
