@@ -7,12 +7,14 @@ from src.domain.ports import CameraPort
 
 # Intentar importar OpenCV y Pillow de forma segura para la cámara
 try:
+    # pyrefly: ignore [missing-import]
     import cv2
     OPENCV_AVAILABLE = True
 except ImportError:
     OPENCV_AVAILABLE = False
 
 try:
+    # pyrefly: ignore [missing-import]
     from PIL import Image, ImageDraw
     PILLOW_AVAILABLE = True
 except ImportError:
@@ -54,26 +56,8 @@ class AdaptiveCameraAdapter(CameraPort):
             try:
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
-                    # Mapear detecciones básicas de personas usando el clasificador Haar Cascade si existe
+                    # Retornar el frame puro sin procesamiento de IA
                     self.person_detected = False
-                    try:
-                        # Procesamiento rápido para la Pi: pasar a escala de grises
-                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        # Detección simplificada de rostros como proxy de personas
-                        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-                        face_cascade = cv2.CascadeClassifier(cascade_path)
-                        if not face_cascade.empty():
-                            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-                            if len(faces) > 0:
-                                self.person_detected = True
-                                for (x, y, w, h) in faces:
-                                    # Dibujar recuadro verde neón
-                                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                                    cv2.putText(frame, "PERSONA", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                    except Exception as e_ia:
-                        # Si falla la IA o el clasificador cascade, continuamos sirviendo el frame limpio
-                        pass
-                    
                     _, jpeg = cv2.imencode('.jpg', frame)
                     return jpeg.tobytes()
             except Exception as e_cam:
@@ -83,7 +67,7 @@ class AdaptiveCameraAdapter(CameraPort):
         return self._generate_simulated_ai_frame()
 
     def _generate_simulated_ai_frame(self) -> bytes:
-        """Generador matemático de fotogramas que emula una cámara de seguridad vigilando con detección de IA."""
+        """Generador matemático de fotogramas que emula una cámara de seguridad vigilando."""
         if not PILLOW_AVAILABLE:
             # Fallback definitivo en binario crudo (un pixel negro en JPEG base64) para evitar dependencias
             return b'\xff\xd8\xff\xdb\x00C\x00\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x14\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xda\x00\x08\x01\x01\x00\x00\x3f\x00\xbf\xff\xd9'
@@ -99,29 +83,7 @@ class AdaptiveCameraAdapter(CameraPort):
         for y in range(0, height, 40):
             draw.line([(0, y), (width, y)], fill="#1f2937", width=1)
 
-        # Generar movimiento sinusoidal para una "persona simulada" caminando
-        t = self.frame_counter * 0.08
-        person_x = int(width / 2 + math.sin(t) * 120)
-        person_y = int(height / 2 + math.cos(t * 0.5) * 30)
-
-        # Emular detección de persona activa de forma periódica
-        self.person_detected = abs(math.sin(t)) > 0.4
-        
-        if self.person_detected:
-            # Dibujar caja de detección verde neón
-            box_width, box_height = 60, 120
-            x1, y1 = person_x - box_width//2, person_y - box_height//2
-            x2, y2 = person_x + box_width//2, person_y + box_height//2
-            
-            draw.rectangle([x1, y1, x2, y2], outline="#10b981", width=3)
-            # Dibujar un avatar simplificado de la persona
-            draw.ellipse([person_x - 15, y1 + 10, person_x + 15, y1 + 40], fill="#10b981") # cabeza
-            draw.line([(person_x, y1 + 40), (person_x, y2 - 30)], fill="#10b981", width=4) # cuerpo
-            
-            # Etiqueta de la IA
-            confidence = int(85 + math.sin(t) * 12)
-            draw.rectangle([x1, y1 - 22, x1 + 115, y1], fill="#10b981")
-            draw.text((x1 + 6, y1 - 18), f"PERSONA: {confidence}%", fill="#ffffff")
+        self.person_detected = False
 
         # Overlay HUD de la cámara de seguridad
         draw.text((15, 15), "REC ● LIVE FEED", fill="#ef4444")

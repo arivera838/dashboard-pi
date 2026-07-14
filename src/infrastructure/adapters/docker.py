@@ -28,13 +28,8 @@ class SubprocessDockerAdapter(DockerManagerPort):
                         state=state
                     ))
         except Exception as e:
-            print(f"Error al listar contenedores Docker (¿Docker está corriendo?): {e}")
-            # Retornar una lista vacía o simulada en desarrollo local si falla
-            return [
-                DockerContainer("d1f8e9a2b3c4", "web-app-production", "nginx:alpine", "Up 3 hours", "running"),
-                DockerContainer("a5b6c7d8e9f0", "db-postgres-local", "postgres:15", "Paused", "paused"),
-                DockerContainer("f9e8d7c6b5a4", "api-gateway", "node:18", "Exited (0) 5 days ago", "exited")
-            ]
+            print(f"Error al listar contenedores Docker: {e}")
+            return []
         return containers
 
     def _execute_command(self, cmd: list) -> bool:

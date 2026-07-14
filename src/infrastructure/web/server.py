@@ -40,9 +40,8 @@ class HexagonalHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                 while True:
                     frame_bytes = camera.get_frame()
                     self.wfile.write(b'--frame\r\n')
-                    self.send_header('Content-Type', 'image/jpeg')
-                    self.send_header('Content-Length', str(len(frame_bytes)))
-                    self.end_headers()
+                    self.wfile.write(b'Content-Type: image/jpeg\r\n')
+                    self.wfile.write(f'Content-Length: {len(frame_bytes)}\r\n\r\n'.encode('utf-8'))
                     self.wfile.write(frame_bytes)
                     self.wfile.write(b'\r\n')
                     # Equilibrar entre FPS y consumo de CPU para la Raspberry Pi 3 B+
