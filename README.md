@@ -64,3 +64,32 @@ Si decides no usar el script `run.sh` y correr el proyecto manualmente paso a pa
    ```bash
    python -m src.main
    ```
+
+---
+
+## Actualización y Despliegue Continuo (Git `main` -> Docker)
+
+Cada vez que incorpores nuevos cambios o hagas un `git pull` de la rama `main` en tu servidor, debes reconstruir el contenedor Docker para aplicar las modificaciones.
+
+Puedes realizarlo de dos formas:
+
+### A. Mediante el script unificado (Recomendado)
+El script reconstruirá y levantará la imagen automáticamente:
+```bash
+git pull origin main
+./run.sh --docker
+```
+
+### B. Comandos nativos de Docker Compose
+Si prefieres administrar los contenedores directamente:
+```bash
+# 1. Traer los últimos cambios
+git pull origin main
+
+# 2. Reconstruir y levantar el contenedor en segundo plano (detached mode)
+docker compose up -d --build
+
+# 3. (Opcional) Limpiar imágenes antiguas o huérfanas para ahorrar espacio en la SD de la Raspberry Pi
+docker image prune -f
+```
+

@@ -8,10 +8,11 @@ ENV PYTHONUNBUFFERED=1
 # Establecer directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema requeridas por OpenCV (headless) y Pillow
+# Instalar dependencias del sistema requeridas por OpenCV (headless), Pillow y Docker CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libgl1 \
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias de Python

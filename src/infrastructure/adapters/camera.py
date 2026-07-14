@@ -51,25 +51,33 @@ class AdaptiveCameraAdapter(CameraPort):
         
         # Caso 1: Intentar capturar desde cámara física real con OpenCV
         if self.cap and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret:
-                # Mapear detecciones básicas de personas usando el clasificador Haar Cascade si existe
-                self.person_detected = False
-                # Procesamiento rápido para la Pi: pasar a escala de grises
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                # Detección simplificada de rostros como proxy de personas
-                face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-                faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-                
-                if len(faces) > 0:
-                    self.person_detected = True
-                    for (x, y, w, h) in faces:
-                        # Dibujar recuadro verde neón
-                        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                        cv2.putText(frame, "PERSONA", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                
-                _, jpeg = cv2.imencode('.jpg', frame)
-                return jpeg.tobytes()
+            try:
+                ret, frame = self.cap.read()
+                if ret and frame is not None:
+                    # Mapear detecciones básicas de personas usando el clasificador Haar Cascade si existe
+                    self.person_detected = False
+                    try:
+                        # Procesamiento rápido para la Pi: pasar a escala de grises
+                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                        # Detección simplificada de rostros como proxy de personas
+                        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                        face_cascade = cv2.CascadeClassifier(cascade_path)
+                        if not face_cascade.empty():
+                            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+                            if len(faces) > 0:
+                                self.person_detected = True
+                                for (x, y, w, h) in faces:
+                                    # Dibujar recuadro verde neón
+                                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                                    cv2.putText(frame, "PERSONA", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    except Exception as e_ia:
+                        # Si falla la IA o el clasificador cascade, continuamos sirviendo el frame limpio
+                        pass
+                    
+                    _, jpeg = cv2.imencode('.jpg', frame)
+                    return jpeg.tobytes()
+            except Exception as e_cam:
+                print(f"Error de captura física en {self.camera_name}: {e_cam}")
 
         # Caso 2: Simulación interactiva con Pillow (Generador Sintético de IA para Desarrollo)
         return self._generate_simulated_ai_frame()

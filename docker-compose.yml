@@ -5,6 +5,12 @@ services:
     build: .
     image: dashboard-pi:latest
     container_name: dashboard-pi-service
+    
+    # Descomenta la siguiente línea en tu Raspberry Pi (Linux) para permitir al escáner de red
+    # realizar barridos ARP reales sobre la WiFi física de tu hogar.
+    # Nota: Si usas network_mode: host, debes comentar la sección 'ports' de abajo.
+    # network_mode: host
+
     ports:
       - "8080:8080"
     volumes:
@@ -15,8 +21,8 @@ services:
       # Opcional: Montajes de lectura de hardware si corre en un host Linux/Raspberry real
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-    devices:
-      # Opcional: Compartir cámaras del host al contenedor si existen
-      - "/dev/video0:/dev/video0"
-      - "/dev/video1:/dev/video1"
+    # devices:
+    #   # Descomentar en Raspberry Pi (Linux) para dar acceso a las cámaras físicas al contenedor
+    #   - "/dev/video0:/dev/video0"
+    #   - "/dev/video1:/dev/video1"
     restart: unless-stopped
