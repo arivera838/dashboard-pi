@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  dashboard-pi:
+    build: .
+    container_name: dashboard-pi
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Permitir controlar el demonio Docker del host
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Permitir lectura de métricas reales del hardware del host Raspberry Pi
+      - /proc:/proc:ro
+      - /sys:/sys:ro
+      # Carpeta donde se clonarán y desplegarán las apps en el host (ajustar si es necesario)
+      - /home/frivera/apps:/root/apps
+    environment:
+      - PYTHONUNBUFFERED=1
