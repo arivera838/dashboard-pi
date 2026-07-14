@@ -21,8 +21,9 @@ except ImportError:
 class AdaptiveCameraAdapter(CameraPort):
     """Adaptador inteligente de vídeo. Utiliza OpenCV si hay cámara física, o simula IA en tiempo real."""
     
-    def __init__(self):
-        self.camera_index = 0
+    def __init__(self, camera_index=0, camera_name="Cámara Nativa"):
+        self.camera_index = camera_index
+        self.camera_name = camera_name
         self.cap = None
         self.person_detected = False
         self.frame_counter = 0
@@ -117,7 +118,7 @@ class AdaptiveCameraAdapter(CameraPort):
         # Overlay HUD de la cámara de seguridad
         draw.text((15, 15), "REC ● LIVE FEED", fill="#ef4444")
         draw.text((width - 150, 15), time.strftime("%Y-%m-%d %H:%M:%S"), fill="#9ca3af")
-        draw.text((15, height - 25), "CAM_VIRTUAL_01 (Raspberry Pi 3 B+)", fill="#6b7280")
+        draw.text((15, height - 25), f"{self.camera_name} (Raspberry Pi)", fill="#6b7280")
 
         # Convertir a bytes en formato JPG
         buf = BytesIO()

@@ -4,14 +4,14 @@ import http.server
 import json
 import subprocess
 import time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 class HexagonalHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     """Controlador que traduce las peticiones HTTP externas en llamadas a los Casos de Uso."""
     
     # Se inyectarán externamente desde main.py
     app_orchestrator = None
-    camera_service = None
+    camera_services = {}  # Mapeo de id -> camera_service (ej: 'native' y 'usb')
 
     # Suprimir logs por consola de peticiones exitosas para no saturar la CPU
     def log_message(self, format, *args):
@@ -24,8 +24,12 @@ class HexagonalHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         
         # 1. API: Servir Video en Tiempo Real usando el protocolo MJPEG (Stream continuo)
         if url_parsed.path == "/api/camera/stream":
-            if not self.camera_service:
-                self.send_error(503, "Servicio de cámara no configurado")
+            query_params = parse_qs(url_parsed.query)
+            camera_id = query_params.get("id", ["native"])[0]
+            
+            camera = self.camera_services.get(camera_id)
+            if not camera:
+                self.send_error(404, f"Cámara con ID '{camera_id}' no encontrada")
                 return
 
             self.send_response(200)
@@ -34,7 +38,7 @@ class HexagonalHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             
             try:
                 while True:
-                    frame_bytes = self.camera_service.get_frame()
+                    frame_bytes = camera.get_frame()
                     self.wfile.write(b'--frame\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', str(len(frame_bytes)))
@@ -47,10 +51,10 @@ class HexagonalHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                 # El usuario simplemente cerró la pestaña del navegador
                 return
             except Exception as e:
-                print(f"Error en el stream de vídeo: {e}")
+                print(f"Error en el stream de vídeo para {camera_id}: {e}")
                 return
 
-        # 2. API: Consultar Estado y Métricas (JSON)
+        # 2. API: Consultar Estado y Métricas de Hardware y Red (JSON)
         elif url_parsed.path == "/api/status":
             if not self.app_orchestrator:
                 self.send_error(503, "Orquestador de aplicación no configurado")
@@ -63,7 +67,52 @@ class HexagonalHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(state).encode("utf-8"))
             return
 
-        # 3. Interfaz Gráfica de usuario principal (HTML)
+        # 3. API: Listar Contenedores Docker (JSON)
+        elif url_parsed.path == "/api/docker/list":
+            if not self.app_orchestrator:
+                self.send_error(503, "Orquestador de aplicación no configurado")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            containers = self.app_orchestrator.list_docker_containers()
+            self.wfile.write(json.dumps(containers).encode("utf-8"))
+            return
+
+        # 4. API: Obtener logs de un contenedor Docker
+        elif url_parsed.path == "/api/docker/logs":
+            if not self.app_orchestrator:
+                self.send_error(503, "Orquestador de aplicación no configurado")
+                return
+
+            query_params = parse_qs(url_parsed.query)
+            container_id = query_params.get("id", [None])[0]
+            if not container_id:
+                self.send_error(400, "Falta el parámetro 'id'")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            logs = self.app_orchestrator.get_container_logs(container_id)
+            self.wfile.write(json.dumps({"logs": logs}).encode("utf-8"))
+            return
+
+        # 5. API: Listar todos los dispositivos registrados en el JSON
+        elif url_parsed.path == "/api/devices/list":
+            if not self.app_orchestrator:
+                self.send_error(503, "Orquestador de aplicación no configurado")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            devices = self.app_orchestrator.list_registered_devices()
+            self.wfile.write(json.dumps(devices).encode("utf-8"))
+            return
+
+        # 6. Interfaz Gráfica de usuario principal (HTML)
         elif url_parsed.path == "/":
             try:
                 template_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
@@ -119,6 +168,36 @@ class HexagonalHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                 response_data = {"status": "success", "message": "¡Despliegue exitoso!", "log": log_output}
             else:
                 response_data = {"status": "error", "message": "Error al compilar el proyecto.", "log": log_output}
+
+        # 3. API POST: Controlar Contenedor Docker (pausar, reanudar, reiniciar)
+        elif url_parsed.path == "/api/docker/action":
+            container_id = params.get("id")
+            action = params.get("action")  # pause, unpause, restart
+            
+            if not container_id or not action:
+                response_data = {"status": "error", "message": "Falta 'id' o 'action'"}
+            else:
+                success = self.app_orchestrator.manage_container(container_id, action)
+                if success:
+                    response_data = {"status": "success", "message": f"Contenedor {action} completado con éxito."}
+                else:
+                    response_data = {"status": "error", "message": f"Fallo al ejecutar la acción {action} en el contenedor."}
+
+        # 4. API POST: Registrar / Modificar datos de dispositivo Wifi por MAC
+        elif url_parsed.path == "/api/devices/register":
+            mac = params.get("mac")
+            name = params.get("name")
+            phone = params.get("phone", "")
+            alert_on_connect = params.get("alert_on_connect", False)
+            
+            if not mac or not name:
+                response_data = {"status": "error", "message": "Falta 'mac' o 'name'"}
+            else:
+                success = self.app_orchestrator.register_device(mac, name, phone, alert_on_connect)
+                if success:
+                    response_data = {"status": "success", "message": "Dispositivo registrado con éxito."}
+                else:
+                    response_data = {"status": "error", "message": "Error al registrar el dispositivo."}
 
         self.wfile.write(json.dumps(response_data).encode("utf-8"))
 

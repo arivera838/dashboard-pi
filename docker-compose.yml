@@ -8,7 +8,15 @@ services:
     ports:
       - "8080:8080"
     volumes:
+      # Montar socket de docker del host para gestionar contenedores desde la app
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistencia de la base de datos local JSON de dispositivos
+      - ./known_devices.json:/app/known_devices.json
       # Opcional: Montajes de lectura de hardware si corre en un host Linux/Raspberry real
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+    devices:
+      # Opcional: Compartir cámaras del host al contenedor si existen
+      - "/dev/video0:/dev/video0"
+      - "/dev/video1:/dev/video1"
     restart: unless-stopped

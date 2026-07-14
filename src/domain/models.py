@@ -18,13 +18,41 @@ class SystemMetric:
 
 class NetworkDevice:
     """Entidad que representa un dispositivo conectado al WiFi de casa."""
-    def __init__(self, ip, mac, interface, name="Dispositivo Desconocido", is_known=False, owner_status="Invitado"):
+    def __init__(self, ip, mac, interface, name="Dispositivo Desconocido", is_known=False, owner_status="Invitado", phone="", alert_on_connect=False):
         self.ip = ip
         self.mac = mac
         self.interface = interface
         self.name = name
         self.is_known = is_known
         self.owner_status = owner_status
+        self.phone = phone
+        self.alert_on_connect = alert_on_connect
 
     def to_dict(self):
         return self.__dict__
+
+
+class RegisteredDevice:
+    """Representa los detalles de un usuario registrado en la base de datos local."""
+    def __init__(self, mac, name, phone="", alert_on_connect=False):
+        self.mac = mac
+        self.name = name
+        self.phone = phone
+        self.alert_on_connect = alert_on_connect
+
+    def to_dict(self):
+        return self.__dict__
+
+
+class DockerContainer:
+    """Entidad que representa el estado de un contenedor Docker en el sistema."""
+    def __init__(self, id, name, image, status, state):
+        self.id = id
+        self.name = name
+        self.image = image
+        self.status = status
+        self.state = state  # running, paused, exited, etc.
+
+    def to_dict(self):
+        return self.__dict__
+
