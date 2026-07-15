@@ -92,22 +92,50 @@ class SubprocessCameraAdapter(CameraPort):
                 "mediapipe_installed": MEDIAPIPE_AVAILABLE
             }
 
-    def _start_all_captures(self):
-        # Escanear y arrancar cámaras USB/V4L2 reales de índice par (video0, video2...)
-        usb_indices = []
-        for i in range(5):
+    def _scan_hardware_cameras(self) -> List[dict]:
+        detected = []
+        # Escanear índices del 0 al 9 en búsqueda de dispositivos de captura de video
+        for i in range(10):
             dev_path = f"/dev/video{i}"
             if os.path.exists(dev_path):
-                if i % 2 == 0:
-                    cam_id = f"usb{i}"
-                    self._camera_device_indices[cam_id] = i
-                    self._start_camera_thread(cam_id, i)
-                    usb_indices.append(i)
+                name = f"Dispositivo de Video {i}"
+                try:
+                    # Leer el nombre real del dispositivo desde sysfs
+                    with open(f"/sys/class/video4linux/video{i}/name", "r") as f:
+                        name = f.read().strip()
+                except Exception:
+                    pass
+                
+                # Descartar dispositivos que no sean capturadores directos (ej. metadatos, codecs, isp)
+                name_lower = name.lower()
+                if "metadata" in name_lower or "params" in name_lower or "bcm2835-isp" in name_lower or "bcm2835-codec" in name_lower:
+                    continue
+                
+                # Identificar si es la cámara CSI Flex basándose en los controladores de la RPi
+                is_csi = any(x in name_lower for x in ["unicam", "rpivid", "imx219", "ov5647", "imx708", "libcameradev", "camera-nativa"])
+                
+                detected.append({
+                    "index": i,
+                    "name": name,
+                    "is_csi": is_csi,
+                    "dev_path": dev_path
+                })
+        return detected
 
-        # Arrancar siempre la cámara CSI (si está conectada, usará GStreamer o el índice libre)
-        csi_index = 0 if not usb_indices else (max(usb_indices) + 1)
-        self._camera_device_indices["csi"] = csi_index
-        self._start_camera_thread("csi", csi_index)
+    def _start_all_captures(self):
+        devices = self._scan_hardware_cameras()
+        usb_count = 0
+        
+        for dev in devices:
+            if dev["is_csi"]:
+                cam_id = "csi"
+                self._camera_device_indices[cam_id] = dev["index"]
+                self._start_camera_thread(cam_id, dev["index"])
+            else:
+                cam_id = f"usb{usb_count}"
+                self._camera_device_indices[cam_id] = dev["index"]
+                self._start_camera_thread(cam_id, dev["index"])
+                usb_count += 1
 
     def _start_camera_thread(self, camera_id: str, device_index: int):
         with self._lock:
@@ -260,50 +288,24 @@ class SubprocessCameraAdapter(CameraPort):
                 )
 
     def list_cameras(self) -> List[CameraInfo]:
+        devices = self._scan_hardware_cameras()
         cameras = []
-        for i in range(5):
-            dev_path = f"/dev/video{i}"
-            if os.path.exists(dev_path):
+        usb_count = 0
+        
+        for dev in devices:
+            if dev["is_csi"]:
                 cameras.append(CameraInfo(
-                    id=f"usb{i}",
-                    name=f"Cámara USB ({dev_path})",
+                    id="csi",
+                    name="Cámara Nativa Raspberry Pi (CSI Flex)",
+                    type="CSI"
+                ))
+            else:
+                cameras.append(CameraInfo(
+                    id=f"usb{usb_count}",
+                    name=f"Cámara USB ({dev['name']})",
                     type="USB"
                 ))
-        
-        csi_detected = False
-        try:
-            import subprocess
-            res = subprocess.run(["vcgencmd", "get_camera"], capture_output=True, text=True)
-            if "detected=1" in res.stdout:
-                csi_detected = True
-        except Exception:
-            pass
-
-        # Alternativa para RPi OS Bullseye/Bookworm con libcamera
-        if not csi_detected:
-            try:
-                import subprocess
-                res = subprocess.run(["libcamera-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
-                if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "Available cameras" in res.stderr or "/base/soc/" in res.stdout or "/base/soc/" in res.stderr):
-                    csi_detected = True
-            except Exception:
-                pass
-
-        if not csi_detected:
-            try:
-                import subprocess
-                res = subprocess.run(["rpicam-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
-                if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "Available cameras" in res.stderr):
-                    csi_detected = True
-            except Exception:
-                pass
-
-        if csi_detected:
-            cameras.append(CameraInfo(
-                id="csi",
-                name="Cámara Nativa Raspberry Pi (CSI Flex)",
-                type="CSI"
-            ))
+                usb_count += 1
 
         if not cameras:
             cameras.append(CameraInfo(
