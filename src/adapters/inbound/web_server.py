@@ -87,6 +87,8 @@ def create_handler_class(
                     
                     if frame_bytes.startswith(b'\x89PNG'):
                         self.send_header("Content-Type", "image/png")
+                    elif frame_bytes.startswith(b'BM'):
+                        self.send_header("Content-Type", "image/bmp")
                     else:
                         self.send_header("Content-Type", "image/jpeg")
                         
@@ -118,6 +120,8 @@ def create_handler_class(
                         self.wfile.write(b'--frame\r\n')
                         if frame_bytes.startswith(b'\x89PNG'):
                             self.wfile.write(b'Content-Type: image/png\r\n\r\n')
+                        elif frame_bytes.startswith(b'BM'):
+                            self.wfile.write(b'Content-Type: image/bmp\r\n\r\n')
                         else:
                             self.wfile.write(b'Content-Type: image/jpeg\r\n\r\n')
                         self.wfile.write(frame_bytes)
