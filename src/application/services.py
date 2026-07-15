@@ -12,7 +12,9 @@ from src.application.ports.inputs import (
     StartRecordingUseCase,
     StopRecordingUseCase,
     GetRecordingStatusUseCase,
-    ListRecordingsUseCase
+    ListRecordingsUseCase,
+    GetVisionSettingsUseCase,
+    UpdateVisionSettingsUseCase
 )
 from src.application.ports.outputs import (
     SystemMetricsRepositoryPort,
@@ -118,3 +120,18 @@ class ListRecordingsService(ListRecordingsUseCase):
 
     def execute(self) -> List[str]:
         return self._camera_port.list_recordings()
+
+class GetVisionSettingsService(GetVisionSettingsUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self) -> dict:
+        return self._camera_port.get_vision_settings()
+
+class UpdateVisionSettingsService(UpdateVisionSettingsUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self, face_enabled: bool, hand_enabled: bool) -> tuple[bool, str]:
+        self._camera_port.set_vision_settings(face_enabled, hand_enabled)
+        return True, "Ajustes de visión artificial actualizados"

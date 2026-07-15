@@ -17,6 +17,13 @@ try:
 except ImportError:
     OPENCV_AVAILABLE = False
 
+# Intentar importar MediaPipe para reconocimiento de manos
+try:
+    import mediapipe as mp
+    MEDIAPIPE_AVAILABLE = True
+except ImportError:
+    MEDIAPIPE_AVAILABLE = False
+
 class SubprocessCameraAdapter(CameraPort):
     _latest_frames: Dict[str, bytes] = {}
     _threads: Dict[str, threading.Thread] = {}
@@ -34,12 +41,56 @@ class SubprocessCameraAdapter(CameraPort):
     # Mapeo de índices de hardware
     _camera_device_indices: Dict[str, int] = {}
 
+    # Configuración de los Plugins de Visión Artificial (Reconocimiento)
+    _face_detection_enabled = False
+    _hand_detection_enabled = False
+    
+    # Clasificadores e inicialización de modelos
+    _face_cascade = None
+    _mp_hands = None
+    _mp_draw = None
+
     def __init__(self):
         # Crear directorio de grabaciones
         os.makedirs(self._recordings_dir, exist_ok=True)
-        # Si OpenCV está disponible, iniciar hilos de captura para cámaras reales encontradas
+        
+        # Inicializar clasificadores si OpenCV está disponible
         if OPENCV_AVAILABLE:
+            try:
+                self._face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            except Exception as e:
+                print(f"[Vision] No se pudo cargar Haar Cascades para Rostros: {e}")
+            
             self._start_all_captures()
+
+        # Inicializar MediaPipe si está disponible
+        if MEDIAPIPE_AVAILABLE:
+            try:
+                self._mp_hands = mp.solutions.hands.Hands(
+                    static_image_mode=False,
+                    max_num_hands=2,
+                    min_detection_confidence=0.5,
+                    min_tracking_confidence=0.5
+                )
+                self._mp_draw = mp.solutions.drawing_utils
+                print("[Vision] Plugin de MediaPipe (Manos) cargado con éxito.")
+            except Exception as e:
+                print(f"[Vision] Error al inicializar MediaPipe: {e}")
+                self._mp_hands = None
+
+    def set_vision_settings(self, face_enabled: bool, hand_enabled: bool):
+        with self._lock:
+            self._face_detection_enabled = face_enabled
+            self._hand_detection_enabled = hand_enabled
+            print(f"[Vision] Ajustes actualizados: Rostros={face_enabled}, Manos={hand_enabled}")
+
+    def get_vision_settings(self) -> Dict[str, bool]:
+        with self._lock:
+            return {
+                "face_enabled": self._face_detection_enabled,
+                "hand_enabled": self._hand_detection_enabled,
+                "mediapipe_installed": MEDIAPIPE_AVAILABLE
+            }
 
     def _start_all_captures(self):
         # Escanear y arrancar cámaras USB/V4L2 reales de índice par (video0, video2...)
@@ -99,7 +150,6 @@ class SubprocessCameraAdapter(CameraPort):
             if cap is None or not cap.isOpened():
                 try:
                     if use_gstreamer:
-                        # Intentar GStreamer libcamerasrc para cámara CSI nativa (RPi OS Bullseye/Bookworm)
                         gst_pipeline = "libcamerasrc ! video/x-raw, width=640, height=480, framerate=25/1 ! videoconvert ! appsink drop=true sync=false"
                         with self._silence_stderr():
                             cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
@@ -123,6 +173,9 @@ class SubprocessCameraAdapter(CameraPort):
                 if not ret or frame is None:
                     raise Exception("No se pudo leer el frame")
                 
+                # Procesar reconocimiento en el fotograma antes de codificar y transmitir
+                self._process_frame_vision(frame)
+
                 # Codificar en JPEG para la UI
                 success, jpeg = cv2.imencode('.jpg', frame)
                 if success:
@@ -132,7 +185,7 @@ class SubprocessCameraAdapter(CameraPort):
                 else:
                     raise Exception("Fallo en la codificación JPEG")
 
-                # Escribir al grabador si está activo
+                # Escribir al grabador de video si está activo
                 with self._lock:
                     if self._recording_active.get(camera_id, False) and camera_id in self._video_writers:
                         try:
@@ -140,10 +193,10 @@ class SubprocessCameraAdapter(CameraPort):
                         except Exception as write_err:
                             print(f"[Camera] Error escribiendo frame al video: {write_err}")
                 
-                time.sleep(0.04) # ~25 FPS
+                # Sleep mínimo para liberar el GIL y mantener fluidez máxima nativa sin sobrecalentar
+                time.sleep(0.005)
             except Exception as e:
                 consecutive_errors += 1
-                # Si GStreamer falla en extraer frames consecutivos, forzar fallback a V4L2 directo
                 if use_gstreamer and consecutive_errors >= 3:
                     print(f"[Camera] GStreamer falló al extraer frames de {camera_id}. Cambiando a V4L2 (Dispositivo {device_index})...")
                     use_gstreamer = False
@@ -161,6 +214,50 @@ class SubprocessCameraAdapter(CameraPort):
         if cap:
             cap.release()
         print(f"[Camera] Hilo de captura finalizado para {camera_id}")
+
+    def _process_frame_vision(self, frame):
+        # 1. Reconocimiento Facial (Haar Cascade)
+        if self._face_detection_enabled and self._face_cascade is not None:
+            try:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = self._face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30))
+                for (x, y, w, h) in faces:
+                    # Dibujar caja de rostro en verde
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (16, 185, 129), 2)
+                    cv2.putText(frame, "ROSTRO", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (16, 185, 129), 2)
+            except Exception as e:
+                pass
+
+        # 2. Reconocimiento de Manos (MediaPipe)
+        if self._hand_detection_enabled:
+            if MEDIAPIPE_AVAILABLE and self._mp_hands is not None:
+                try:
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    results = self._mp_hands.process(rgb_frame)
+                    if results.multi_hand_landmarks:
+                        for hand_landmarks in results.multi_hand_landmarks:
+                            # Dibujar puntos y conexiones de la mano en azul/blanco
+                            self._mp_draw.draw_landmarks(
+                                frame, 
+                                hand_landmarks, 
+                                mp.solutions.hands.HAND_CONNECTIONS,
+                                self._mp_draw.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=2),
+                                self._mp_draw.DrawingSpec(color=(59, 130, 246), thickness=2)
+                            )
+                except Exception as e:
+                    pass
+            else:
+                # Mostrar marca de agua solicitando la instalación de mediapipe
+                cv2.putText(
+                    frame, 
+                    "Instala MediaPipe para detectar manos: pip install mediapipe", 
+                    (10, frame.shape[0] - 15), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 
+                    0.4, 
+                    (59, 130, 246), 
+                    1, 
+                    cv2.LINE_AA
+                )
 
     def list_cameras(self) -> List[CameraInfo]:
         cameras = []
@@ -187,7 +284,6 @@ class SubprocessCameraAdapter(CameraPort):
             try:
                 import subprocess
                 res = subprocess.run(["libcamera-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
-                # Si hay cámaras disponibles en el stderr/stdout
                 if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "Available cameras" in res.stderr or "/base/soc/" in res.stdout or "/base/soc/" in res.stderr):
                     csi_detected = True
             except Exception:
@@ -330,5 +426,25 @@ class SubprocessCameraAdapter(CameraPort):
         return files
 
     def _get_placeholder_image(self, label: str) -> bytes:
-        # PNG de 1x1 píxel transparente
-        return b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x01\x00\x00\xff\xff\x03\x00\x00\x06\x00\x05\x57\xbf\xab\xd4\x00\x00\x00\x00IEND\xaeB`\x82'
+        # Retorna un BMP gris sólido de 640x480
+        width, height = 640, 480
+        file_size = 54 + (width * height * 3)
+        header = bytearray([
+            0x42, 0x4D,
+            file_size & 0xFF, (file_size >> 8) & 0xFF, (file_size >> 16) & 0xFF, (file_size >> 24) & 0xFF,
+            0x00, 0x00, 0x00, 0x00,
+            54, 0x00, 0x00, 0x00,
+            40, 0x00, 0x00, 0x00,
+            width & 0xFF, (width >> 8) & 0xFF, (width >> 16) & 0xFF, (width >> 24) & 0xFF,
+            height & 0xFF, (height >> 8) & 0xFF, (height >> 16) & 0xFF, (height >> 24) & 0xFF,
+            0x01, 0x00,
+            24, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ])
+        pixels = bytearray([59, 41, 30]) * (width * height) # BGR values for RGB(30, 41, 59)
+        return bytes(header + pixels)

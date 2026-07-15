@@ -17,7 +17,9 @@ from src.application.ports.inputs import (
     StartRecordingUseCase,
     StopRecordingUseCase,
     GetRecordingStatusUseCase,
-    ListRecordingsUseCase
+    ListRecordingsUseCase,
+    GetVisionSettingsUseCase,
+    UpdateVisionSettingsUseCase
 )
 
 def create_handler_class(
@@ -32,7 +34,9 @@ def create_handler_class(
     start_recording_use_case: StartRecordingUseCase,
     stop_recording_use_case: StopRecordingUseCase,
     get_recording_status_use_case: GetRecordingStatusUseCase,
-    list_recordings_use_case: ListRecordingsUseCase
+    list_recordings_use_case: ListRecordingsUseCase,
+    get_vision_settings_use_case: GetVisionSettingsUseCase,
+    update_vision_settings_use_case: UpdateVisionSettingsUseCase
 ):
     class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -155,6 +159,15 @@ def create_handler_class(
                 self.wfile.write(json.dumps(files).encode("utf-8"))
                 return
 
+            # 1.375 API: Obtener ajustes de visión artificial (rostro/manos)
+            elif url_parsed.path == "/api/camera/vision/settings":
+                settings = get_vision_settings_use_case.execute()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(settings).encode("utf-8"))
+                return
+
             # 1.38 API: Descargar archivo de video
             elif url_parsed.path == "/api/camera/recordings/download":
                 query_params = parse_qs(url_parsed.query)
@@ -261,6 +274,13 @@ def create_handler_class(
                 else:
                     response_data = {"status": "error", "message": "Falta el ID de la camara"}
 
+            # 6. API POST: Actualizar ajustes de visión artificial (rostro/manos)
+            elif url_parsed.path == "/api/camera/vision/settings":
+                face_enabled = params.get("face_enabled") == "true" or params.get("face_enabled") is True
+                hand_enabled = params.get("hand_enabled") == "true" or params.get("hand_enabled") is True
+                success, msg = update_vision_settings_use_case.execute(face_enabled, hand_enabled)
+                response_data = {"status": "success" if success else "error", "message": msg}
+
             self.wfile.write(json.dumps(response_data).encode("utf-8"))
 
     return DashboardRequestHandler
@@ -281,7 +301,9 @@ class WebServer:
         start_recording_use_case: StartRecordingUseCase,
         stop_recording_use_case: StopRecordingUseCase,
         get_recording_status_use_case: GetRecordingStatusUseCase,
-        list_recordings_use_case: ListRecordingsUseCase
+        list_recordings_use_case: ListRecordingsUseCase,
+        get_vision_settings_use_case: GetVisionSettingsUseCase,
+        update_vision_settings_use_case: UpdateVisionSettingsUseCase
     ):
         self.port = port
         self.handler_class = create_handler_class(
@@ -296,7 +318,9 @@ class WebServer:
             start_recording_use_case,
             stop_recording_use_case,
             get_recording_status_use_case,
-            list_recordings_use_case
+            list_recordings_use_case,
+            get_vision_settings_use_case,
+            update_vision_settings_use_case
         )
 
     def start(self):

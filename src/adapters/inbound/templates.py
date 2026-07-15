@@ -287,6 +287,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <p class="text-xs text-gray-400 mb-6">
                     Muestra las transmisiones en tiempo real. Utiliza los botones inferiores para iniciar/detener grabaciones directamente en tu Raspberry Pi.
                 </p>
+
+                <!-- Control de Plugins de Inteligencia Artificial (Visión) -->
+                <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 mb-6 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex flex-col">
+                        <span class="font-bold text-sm text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-brain text-indigo-400"></i> Plugins de Inteligencia Artificial
+                        </span>
+                        <span class="text-[11px] text-gray-400">Activa el reconocimiento en tiempo real sobre los flujos de video.</span>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <label class="relative inline-flex items-center cursor-pointer select-none">
+                            <input type="checkbox" id="vision-face-toggle" onchange="updateVisionSettings()" class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            <span class="ml-2 text-xs font-bold text-gray-300">Reconocimiento Facial</span>
+                        </label>
+                        <label class="relative inline-flex items-center cursor-pointer select-none">
+                            <input type="checkbox" id="vision-hand-toggle" onchange="updateVisionSettings()" class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                            <span class="ml-2 text-xs font-bold text-gray-300">Reconocimiento de Manos</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div id="cameras-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="col-span-2 text-center py-8 text-gray-500 text-xs">Cargando cámaras disponibles...</div>
                 </div>
@@ -419,6 +442,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (tabId === "cameras") {
                 loadCameraList();
                 loadRecordings();
+                loadVisionSettings();
                 startStatusPolling();
             } else {
                 stopStatusPolling();
@@ -716,6 +740,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             } catch (e) {
                 showToast("Error", "No se pudo comunicar con el servidor de cámara.", "error");
+            }
+        }
+
+        // --- MÉTODOS DE AJUSTES DE INTELIGENCIA ARTIFICIAL (ROSTROS/MANOS) ---
+        async function loadVisionSettings() {
+            try {
+                const res = await fetch("/api/camera/vision/settings");
+                const settings = await res.json();
+                document.getElementById("vision-face-toggle").checked = settings.face_enabled;
+                document.getElementById("vision-hand-toggle").checked = settings.hand_enabled;
+            } catch (err) {
+                console.error("Error al cargar ajustes de visión:", err);
+            }
+        }
+
+        async function updateVisionSettings() {
+            const face = document.getElementById("vision-face-toggle").checked;
+            const hand = document.getElementById("vision-hand-toggle").checked;
+            
+            try {
+                const res = await fetch("/api/camera/vision/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ face_enabled: face, hand_enabled: hand })
+                });
+                const result = await res.json();
+                if (result.status === "success") {
+                    showToast("IA Visión", "Ajustes de reconocimiento actualizados", "success");
+                } else {
+                    showToast("Error", result.message, "error");
+                }
+            } catch (err) {
+                showToast("Error", "No se pudieron guardar los ajustes de visión.", "error");
             }
         }
 

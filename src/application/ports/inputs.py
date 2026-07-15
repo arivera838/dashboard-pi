@@ -61,3 +61,13 @@ class ListRecordingsUseCase(ABC):
     @abstractmethod
     def execute(self) -> List[str]:
         pass
+
+class GetVisionSettingsUseCase(ABC):
+    @abstractmethod
+    def execute(self) -> dict:
+        pass
+
+class UpdateVisionSettingsUseCase(ABC):
+    @abstractmethod
+    def execute(self, face_enabled: bool, hand_enabled: bool) -> tuple[bool, str]:
+        pass

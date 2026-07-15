@@ -59,6 +59,14 @@ class CameraPort(ABC):
     def list_recordings(self) -> List[str]:
         pass
 
+    @abstractmethod
+    def set_vision_settings(self, face_enabled: bool, hand_enabled: bool):
+        pass
+
+    @abstractmethod
+    def get_vision_settings(self) -> dict:
+        pass
+
 class NetworkPort(ABC):
     @abstractmethod
     def list_wifi_clients(self) -> List[WifiClient]:
