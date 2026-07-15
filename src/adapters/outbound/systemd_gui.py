@@ -11,14 +11,14 @@ class SystemdGuiController(GuiControllerPort):
 
     def start_gui(self) -> bool:
         try:
-            res = subprocess.run(["sudo", "systemctl", "start", "lightdm"], capture_output=True, text=True)
-            return res.returncode == 0
+            subprocess.run(["sudo", "systemctl", "start", "lightdm"], capture_output=True, text=True)
+            return True
         except Exception:
             return False
 
     def stop_gui(self) -> bool:
         try:
-            res = subprocess.run(["sudo", "systemctl", "stop", "lightdm"], capture_output=True, text=True)
-            return res.returncode == 0
+            subprocess.run(["sudo", "systemctl", "stop", "lightdm"], capture_output=True, text=True)
+            return True
         except Exception:
             return False
