@@ -36,16 +36,19 @@ class SubprocessCameraAdapter(CameraPort):
             self._start_all_captures()
 
     def _start_all_captures(self):
-        # Escanear y arrancar cámaras USB reales
+        # Escanear y arrancar cámaras USB/V4L2 reales de índice par (video0, video2...)
+        usb_indices = []
         for i in range(5):
             dev_path = f"/dev/video{i}"
             if os.path.exists(dev_path):
-                cam_id = f"usb{i}"
-                self._start_camera_thread(cam_id, i)
+                if i % 2 == 0:
+                    cam_id = f"usb{i}"
+                    self._start_camera_thread(cam_id, i)
+                    usb_indices.append(i)
 
-        # Cámara CSI
-        if not self._threads:
-            self._start_camera_thread("csi", 0)
+        # Arrancar siempre la cámara CSI (si está conectada, usará GStreamer o el índice libre)
+        csi_index = 0 if not usb_indices else (max(usb_indices) + 1)
+        self._start_camera_thread("csi", csi_index)
 
     def _start_camera_thread(self, camera_id: str, device_index: int):
         with self._lock:
@@ -70,7 +73,16 @@ class SubprocessCameraAdapter(CameraPort):
         while self._running.get(camera_id, False):
             if cap is None or not cap.isOpened():
                 try:
-                    cap = cv2.VideoCapture(device_index)
+                    if camera_id == "csi":
+                        # Intentar GStreamer libcamerasrc para cámara CSI nativa (RPi OS Bullseye/Bookworm)
+                        gst_pipeline = "libcamerasrc ! video/x-raw, width=640, height=480, framerate=25/1 ! videoconvert ! appsink drop=true sync=false"
+                        cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+                        if not cap.isOpened():
+                            # Fallback si GStreamer no está disponible
+                            cap = cv2.VideoCapture(device_index)
+                    else:
+                        cap = cv2.VideoCapture(device_index)
+                    
                     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                     consecutive_errors = 0
