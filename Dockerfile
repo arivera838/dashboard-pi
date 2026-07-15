@@ -16,7 +16,7 @@ COPY main.py .
 COPY src/ ./src/
 
 # Exponer el puerto
-EXPOSE 8080
+EXPOSE 8083
 
 # Ejecutar el servidor
 CMD ["python", "main.py"]
