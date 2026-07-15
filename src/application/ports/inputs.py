@@ -24,7 +24,7 @@ class GetDockerContainerLogsUseCase(ABC):
 
 class DeployAppUseCase(ABC):
     @abstractmethod
-    def execute(self, repo_url: str, target_dir: str | None, app_name: str) -> DeploymentResult:
+    def execute(self, repo_url: str, target_dir: str | None, app_name: str, app_port: str | None) -> DeploymentResult:
         pass
 
 class GetCamerasUseCase(ABC):

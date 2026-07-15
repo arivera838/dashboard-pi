@@ -145,9 +145,10 @@ def create_handler_class(
                 repo_url = params.get("repo_url")
                 target_dir = params.get("target_dir")
                 app_name = params.get("app_name", "mi-proyecto-web")
+                app_port = params.get("app_port")
                 
                 if repo_url:
-                    res = deploy_use_case.execute(repo_url, target_dir, app_name)
+                    res = deploy_use_case.execute(repo_url, target_dir, app_name, app_port)
                     response_data = res.to_dict()
                 else:
                     response_data = {"status": "error", "message": "Falta la URL del repositorio de Git."}

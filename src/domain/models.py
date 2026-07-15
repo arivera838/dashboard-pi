@@ -43,6 +43,7 @@ class DockerContainer:
     status: str
     image: str
     running: bool
+    ports: str
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -50,7 +51,8 @@ class DockerContainer:
             "name": self.name,
             "status": self.status,
             "image": self.image,
-            "running": self.running
+            "running": self.running,
+            "ports": self.ports
         }
 
 @dataclass(frozen=True)

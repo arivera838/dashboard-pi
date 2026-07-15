@@ -208,7 +208,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </p>
 
                         <form id="cicd-form" onsubmit="handleDeploy(event)" class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Nombre de la Aplicación</label>
                                     <input type="text" id="deploy-name" placeholder="ej. mi-chatbot-telegram" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
@@ -216,6 +216,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Ruta Destino (Opcional)</label>
                                     <input type="text" id="deploy-path" placeholder="Dejar vacío para usar ruta default (~/apps)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-400 mb-1">Puerto de la App (Opcional)</label>
+                                    <input type="number" id="deploy-port" placeholder="ej. 8000" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                                 </div>
                             </div>
                             <div>
@@ -257,13 +261,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     <tr class="border-b border-gray-800 text-xs uppercase text-gray-400 tracking-wider">
                                         <th class="py-3 px-4 font-semibold">Contenedor</th>
                                         <th class="py-3 px-4 font-semibold">Imagen</th>
+                                        <th class="py-3 px-4 font-semibold">Puertos</th>
                                         <th class="py-3 px-4 font-semibold">Estado</th>
                                         <th class="py-3 px-4 font-semibold text-right">Controles Rápidos</th>
                                     </tr>
                                 </thead>
                                 <tbody id="docker-list" class="divide-y divide-gray-800/50 text-sm">
                                     <tr>
-                                        <td colspan="4" class="py-8 text-center text-gray-500 text-xs">Cargando contenedores Docker activos...</td>
+                                        <td colspan="5" class="py-8 text-center text-gray-500 text-xs">Cargando contenedores Docker activos...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -455,7 +460,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function renderDocker(containers) {
             const tbody = document.getElementById("docker-list");
             if (!containers || containers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-500 text-xs">No se encontraron contenedores Docker activos en esta Raspberry.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">No se encontraron contenedores Docker activos en esta Raspberry.</td></tr>`;
                 return;
             }
 
@@ -466,6 +471,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <div class="text-[10px] text-gray-500 code-font">${c.id}</div>
                     </td>
                     <td class="py-3.5 px-4 text-xs code-font text-gray-400">${c.image}</td>
+                    <td class="py-3.5 px-4 text-xs code-font text-gray-400">${c.ports || '—'}</td>
                     <td class="py-3.5 px-4">
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${c.running ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}">
                             <span class="h-1.5 w-1.5 rounded-full ${c.running ? 'bg-emerald-400' : 'bg-red-400'}"></span>
@@ -576,6 +582,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const repo_url = document.getElementById("deploy-repo").value;
             const target_dir = document.getElementById("deploy-path").value;
             const app_name = document.getElementById("deploy-name").value;
+            const app_port = document.getElementById("deploy-port").value;
 
             // Bloquear interfaz
             btn.disabled = true;
@@ -587,7 +594,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const res = await fetch("/api/cicd/deploy", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ repo_url, target_dir, app_name })
+                    body: JSON.stringify({ repo_url, target_dir, app_name, app_port })
                 });
                 const result = await res.json();
                 

@@ -8,20 +8,26 @@ class CliDockerController(DockerControllerPort):
         containers = []
         try:
             res = subprocess.run(
-                ["docker", "ps", "-a", "--format", "{{.ID}}|{{.Names}}|{{.Status}}|{{.Image}}"],
+                ["docker", "ps", "-a", "--format", "{{.ID}}|{{.Names}}|{{.Status}}|{{.Image}}|{{.Ports}}"],
                 capture_output=True, text=True
             )
             lines = res.stdout.strip().split("\n")
             for line in lines:
                 if "|" in line:
-                    cid, name, status, img = line.split("|")
+                    parts = line.split("|")
+                    if len(parts) >= 5:
+                        cid, name, status, img, ports = parts[:5]
+                    else:
+                        cid, name, status, img = parts[:4]
+                        ports = ""
                     is_running = "Up" in status
                     containers.append(DockerContainer(
                         id=cid,
                         name=name,
                         status=status,
                         image=img,
-                        running=is_running
+                        running=is_running,
+                        ports=ports
                     ))
         except Exception as e:
             print(f"Error al listar Docker: {e}")

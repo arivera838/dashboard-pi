@@ -3,7 +3,7 @@ import subprocess
 from src.application.ports.outputs import DeployerPort
 
 class SubprocessDeployer(DeployerPort):
-    def deploy(self, repo_url: str, target_dir: str | None, app_name: str) -> tuple[bool, str]:
+    def deploy(self, repo_url: str, target_dir: str | None, app_name: str, app_port: str | None) -> tuple[bool, str]:
         try:
             # 1. Asegurar ruta destino limpia
             base_path = os.path.expanduser(f"~/apps/{app_name}")
@@ -27,7 +27,8 @@ class SubprocessDeployer(DeployerPort):
             deploy_log = "Repositorio descargado con éxito.\n"
             if os.path.exists(compose_file):
                 deploy_log += "Detectado docker-compose.yml, levantando servicios...\n"
-                docker_cmd = f"cd {base_path} && docker compose up -d --build"
+                env_prefix = f"PORT={app_port} " if app_port else ""
+                docker_cmd = f"cd {base_path} && {env_prefix}docker compose up -d --build"
                 dock_res = subprocess.run(docker_cmd, shell=True, capture_output=True, text=True)
                 deploy_log += dock_res.stdout + "\n" + dock_res.stderr
                 if dock_res.returncode != 0:
