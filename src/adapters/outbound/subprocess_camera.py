@@ -5,8 +5,9 @@ from typing import List, Dict
 from src.domain.models import CameraInfo, RecordingStatus
 from src.application.ports.outputs import CameraPort
 
-# Silenciar advertencias internas de la librería de C++ de OpenCV
+# Silenciar advertencias internas de la librería de C++ de OpenCV y GStreamer
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+os.environ["GST_DEBUG"] = "0"
 
 try:
     import cv2
