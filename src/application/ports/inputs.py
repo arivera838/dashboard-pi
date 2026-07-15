@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient
+from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient, RecordingStatus
 
 class GetSystemStatusUseCase(ABC):
     @abstractmethod
@@ -40,4 +40,24 @@ class CaptureCameraFrameUseCase(ABC):
 class GetWifiClientsUseCase(ABC):
     @abstractmethod
     def execute(self) -> List[WifiClient]:
+        pass
+
+class StartRecordingUseCase(ABC):
+    @abstractmethod
+    def execute(self, camera_id: str) -> tuple[bool, str]:
+        pass
+
+class StopRecordingUseCase(ABC):
+    @abstractmethod
+    def execute(self, camera_id: str) -> tuple[bool, str]:
+        pass
+
+class GetRecordingStatusUseCase(ABC):
+    @abstractmethod
+    def execute(self, camera_id: str) -> RecordingStatus:
+        pass
+
+class ListRecordingsUseCase(ABC):
+    @abstractmethod
+    def execute(self) -> List[str]:
         pass

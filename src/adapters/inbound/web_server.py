@@ -1,6 +1,8 @@
 import http.server
 import json
 import socketserver
+import time
+import os
 from urllib.parse import urlparse, parse_qs
 from src.adapters.inbound.templates import HTML_TEMPLATE
 from src.application.ports.inputs import (
@@ -11,7 +13,11 @@ from src.application.ports.inputs import (
     DeployAppUseCase,
     GetCamerasUseCase,
     CaptureCameraFrameUseCase,
-    GetWifiClientsUseCase
+    GetWifiClientsUseCase,
+    StartRecordingUseCase,
+    StopRecordingUseCase,
+    GetRecordingStatusUseCase,
+    ListRecordingsUseCase
 )
 
 def create_handler_class(
@@ -22,7 +28,11 @@ def create_handler_class(
     deploy_use_case: DeployAppUseCase,
     get_cameras_use_case: GetCamerasUseCase,
     capture_frame_use_case: CaptureCameraFrameUseCase,
-    get_wifi_clients_use_case: GetWifiClientsUseCase
+    get_wifi_clients_use_case: GetWifiClientsUseCase,
+    start_recording_use_case: StartRecordingUseCase,
+    stop_recording_use_case: StopRecordingUseCase,
+    get_recording_status_use_case: GetRecordingStatusUseCase,
+    list_recordings_use_case: ListRecordingsUseCase
 ):
     class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -75,7 +85,6 @@ def create_handler_class(
                     frame_bytes = capture_frame_use_case.execute(camera_id)
                     self.send_response(200)
                     
-                    # Detectar si es PNG o JPEG a partir de los bytes mágicos
                     if frame_bytes.startswith(b'\x89PNG'):
                         self.send_header("Content-Type", "image/png")
                     else:
@@ -85,10 +94,87 @@ def create_handler_class(
                     try:
                         self.wfile.write(frame_bytes)
                     except (BrokenPipeError, ConnectionResetError):
-                        # La conexión fue cancelada por el cliente (navegador) al refrescar el feed
                         pass
                 else:
                     self.send_error(400, "Falta el ID de la camara")
+                return
+
+            # 1.35 API: Streaming MJPEG fluido de cámara (Transmisión continua)
+            elif url_parsed.path == "/api/camera/stream":
+                query_params = parse_qs(url_parsed.query)
+                camera_id = query_params.get("id", [None])[0]
+                
+                if not camera_id:
+                    self.send_error(400, "Falta el ID de la camara")
+                    return
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
+                self.end_headers()
+                
+                try:
+                    while True:
+                        frame_bytes = capture_frame_use_case.execute(camera_id)
+                        self.wfile.write(b'--frame\r\n')
+                        if frame_bytes.startswith(b'\x89PNG'):
+                            self.wfile.write(b'Content-Type: image/png\r\n\r\n')
+                        else:
+                            self.wfile.write(b'Content-Type: image/jpeg\r\n\r\n')
+                        self.wfile.write(frame_bytes)
+                        self.wfile.write(b'\r\n')
+                        time.sleep(0.04) # ~25 FPS
+                except (BrokenPipeError, ConnectionResetError):
+                    # El cliente cerró la pestaña o detuvo la reproducción
+                    pass
+                return
+
+            # 1.36 API: Obtener estado de grabación
+            elif url_parsed.path == "/api/camera/record/status":
+                query_params = parse_qs(url_parsed.query)
+                camera_id = query_params.get("id", [None])[0]
+                if camera_id:
+                    status = get_recording_status_use_case.execute(camera_id)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(status.to_dict()).encode("utf-8"))
+                else:
+                    self.send_error(400, "Falta el ID de la camara")
+                return
+
+            # 1.37 API: Listar grabaciones guardadas
+            elif url_parsed.path == "/api/camera/recordings":
+                files = list_recordings_use_case.execute()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(files).encode("utf-8"))
+                return
+
+            # 1.38 API: Descargar archivo de video
+            elif url_parsed.path == "/api/camera/recordings/download":
+                query_params = parse_qs(url_parsed.query)
+                filename = query_params.get("file", [None])[0]
+                if not filename or ".." in filename or "/" in filename:
+                    self.send_error(400, "Nombre de archivo invalido")
+                    return
+                
+                filepath = os.path.join("./recordings", filename)
+                if not os.path.exists(filepath):
+                    self.send_error(404, "Archivo no encontrado")
+                    return
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "video/x-msvideo")
+                self.send_header("Content-Disposition", f"attachment; filename={filename}")
+                self.send_header("Content-Length", str(os.path.getsize(filepath)))
+                self.end_headers()
+                
+                try:
+                    with open(filepath, "rb") as f:
+                        self.wfile.write(f.read())
+                except Exception:
+                    pass
                 return
 
             # 1.4 API: Clientes de red conectados
@@ -153,6 +239,24 @@ def create_handler_class(
                 else:
                     response_data = {"status": "error", "message": "Falta la URL del repositorio de Git."}
 
+            # 4. API POST: Iniciar grabación de cámara
+            elif url_parsed.path == "/api/camera/record/start":
+                camera_id = params.get("id")
+                if camera_id:
+                    success, msg = start_recording_use_case.execute(camera_id)
+                    response_data = {"status": "success" if success else "error", "message": msg}
+                else:
+                    response_data = {"status": "error", "message": "Falta el ID de la camara"}
+
+            # 5. API POST: Detener grabación de cámara
+            elif url_parsed.path == "/api/camera/record/stop":
+                camera_id = params.get("id")
+                if camera_id:
+                    success, msg = stop_recording_use_case.execute(camera_id)
+                    response_data = {"status": "success" if success else "error", "message": msg}
+                else:
+                    response_data = {"status": "error", "message": "Falta el ID de la camara"}
+
             self.wfile.write(json.dumps(response_data).encode("utf-8"))
 
     return DashboardRequestHandler
@@ -169,7 +273,11 @@ class WebServer:
         deploy_use_case: DeployAppUseCase,
         get_cameras_use_case: GetCamerasUseCase,
         capture_frame_use_case: CaptureCameraFrameUseCase,
-        get_wifi_clients_use_case: GetWifiClientsUseCase
+        get_wifi_clients_use_case: GetWifiClientsUseCase,
+        start_recording_use_case: StartRecordingUseCase,
+        stop_recording_use_case: StopRecordingUseCase,
+        get_recording_status_use_case: GetRecordingStatusUseCase,
+        list_recordings_use_case: ListRecordingsUseCase
     ):
         self.port = port
         self.handler_class = create_handler_class(
@@ -180,7 +288,11 @@ class WebServer:
             deploy_use_case,
             get_cameras_use_case,
             capture_frame_use_case,
-            get_wifi_clients_use_case
+            get_wifi_clients_use_case,
+            start_recording_use_case,
+            stop_recording_use_case,
+            get_recording_status_use_case,
+            list_recordings_use_case
         )
 
     def start(self):

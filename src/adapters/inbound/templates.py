@@ -65,7 +65,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </button>
         </div>
 
-        <!-- Grid de Estado y Métricas (Común para tener contexto de salud) -->
+        <!-- Grid de Estado y Métricas -->
         <section class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             
             <!-- CPU Load Card -->
@@ -83,7 +83,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- Procesor Temp Card -->
+            <!-- Processor Temp Card -->
             <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 relative overflow-hidden group hover:border-orange-500/30 transition-all duration-300">
                 <div class="flex justify-between items-start mb-4">
                     <span class="text-xs font-semibold tracking-wider uppercase text-gray-400">Temperatura CPU</span>
@@ -172,7 +172,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                             <div class="flex justify-between text-xs py-2">
                                 <span class="text-gray-400">Ruta de despliegues</span>
-                                <span class="code-font text-gray-200">/home/frivera/apps/</span>
+                                <span class="code-font text-gray-200">/root/apps/</span>
                             </div>
                         </div>
                     </div>
@@ -279,16 +279,43 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </section>
 
         <!-- SECCIÓN 2: CÁMARAS -->
-        <section id="tab-content-cameras" class="hidden">
+        <section id="tab-content-cameras" class="hidden space-y-8">
             <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <i class="fa-solid fa-camera text-emerald-400"></i> Cámaras Conectadas
+                <h2 class="text-lg font-bold mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-video text-emerald-400"></i> Cámaras Conectadas (Streaming a 30 FPS)
                 </h2>
                 <p class="text-xs text-gray-400 mb-6">
-                    Visualiza las transmisiones de tus cámaras USB y CSI. Las imágenes se actualizan automáticamente bajo demanda.
+                    Muestra las transmisiones en tiempo real. Utiliza los botones inferiores para iniciar/detener grabaciones directamente en tu Raspberry Pi.
                 </p>
                 <div id="cameras-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="col-span-2 text-center py-8 text-gray-500 text-xs">Cargando cámaras disponibles...</div>
+                </div>
+            </div>
+
+            <!-- Listado de Grabaciones Guardadas -->
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-5">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-photo-film text-indigo-400"></i> Grabaciones de Video Almacenadas
+                    </h2>
+                    <button onclick="loadRecordings()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-800 text-xs uppercase text-gray-400 tracking-wider">
+                                <th class="py-3 px-4 font-semibold">Nombre del Archivo</th>
+                                <th class="py-3 px-4 font-semibold text-right">Descargar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordings-list" class="divide-y divide-gray-800/50 text-sm">
+                            <tr>
+                                <td colspan="2" class="py-8 text-center text-gray-500 text-xs">No hay grabaciones de video registradas.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -363,8 +390,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <!-- Script de lógica e interacción en el Frontend -->
     <script>
-        let cameraInterval = null;
         let activeTab = "dashboard";
+        let recordingStatusInterval = null;
 
         function switchTab(tabId) {
             activeTab = tabId;
@@ -391,8 +418,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             // Disparar acciones según pestaña activa
             if (tabId === "cameras") {
                 loadCameraList();
+                loadRecordings();
+                startStatusPolling();
             } else {
-                stopCameraStreams();
+                stopStatusPolling();
             }
 
             if (tabId === "network") {
@@ -412,6 +441,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Consultar métricas del backend de Python
         async function refreshData() {
+            if (activeTab !== "dashboard") return;
             try {
                 const res = await fetch("/api/status");
                 const data = await res.json();
@@ -422,7 +452,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 document.getElementById("stat-cpu-bar").style.width = `${cpuVal}%`;
 
                 document.getElementById("stat-cpu-temp").innerText = data.system.cpu_temp;
-                const tempVal = Math.min((data.system.cpu_temp / 85) * 100, 100); // 85C es limite crítico
+                const tempVal = Math.min((data.system.cpu_temp / 85) * 100, 100);
                 document.getElementById("stat-temp-bar").style.width = `${tempVal}%`;
 
                 document.getElementById("stat-ram-percent").innerText = `${data.system.ram_percent}%`;
@@ -631,38 +661,137 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <div class="bg-gray-950 border border-gray-800 rounded-xl overflow-hidden p-4 flex flex-col gap-3">
                         <div class="flex justify-between items-center">
                             <span class="font-bold text-sm text-white">${cam.name}</span>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">${cam.type}</span>
-                        </div>
-                        <div class="bg-gray-900 border border-gray-800/50 rounded-lg aspect-video flex items-center justify-center overflow-hidden relative">
-                            <img data-camera-id="${cam.id}" class="camera-stream-img w-full h-full object-cover" src="/api/camera/frame?id=${cam.id}" alt="Stream">
-                            <div class="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[9px] text-gray-300 code-font flex items-center gap-1">
-                                <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
+                            <div class="flex gap-1.5 items-center">
+                                <span id="recording-badge-${cam.id}" class="hidden px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 uppercase animate-pulse flex items-center gap-1">
+                                    <span class="h-1.5 w-1.5 bg-red-500 rounded-full"></span> REC <span id="recording-timer-${cam.id}">00:00</span>
+                                </span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">${cam.type}</span>
                             </div>
+                        </div>
+                        
+                        <!-- Transmisión de Video Fluido vía MJPEG /api/camera/stream -->
+                        <div class="bg-gray-900 border border-gray-800/50 rounded-lg aspect-video flex items-center justify-center overflow-hidden relative">
+                            <img class="w-full h-full object-cover" src="/api/camera/stream?id=${cam.id}" alt="Stream">
+                            <div class="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[9px] text-gray-300 code-font flex items-center gap-1">
+                                <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE (30 FPS)
+                            </div>
+                        </div>
+                        
+                        <!-- Botón para Iniciar/Detener Grabación -->
+                        <div class="flex justify-end pt-1">
+                            <button id="record-btn-${cam.id}" onclick="toggleRecording('${cam.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+                                <i class="fa-solid fa-circle text-[8px] text-red-400 animate-pulse"></i> Iniciar Grabación
+                            </button>
                         </div>
                     </div>
                 `).join('');
 
-                startCameraStreams();
+                pollRecordingsStatus();
             } catch (err) {
                 console.error("Error cargando cámaras:", err);
             }
         }
 
-        function startCameraStreams() {
-            stopCameraStreams();
-            cameraInterval = setInterval(() => {
-                const imgs = document.querySelectorAll(".camera-stream-img");
-                imgs.forEach(img => {
-                    const camId = img.dataset.cameraId;
-                    img.src = `/api/camera/frame?id=${camId}&t=${Date.now()}`;
+        // Grabar/Detener cámara
+        async function toggleRecording(cameraId) {
+            const btn = document.getElementById(`record-btn-${cameraId}`);
+            const isRecording = btn.classList.contains("bg-red-600"); // Si está en rojo, está grabando
+
+            const endpoint = isRecording ? "/api/camera/record/stop" : "/api/camera/record/start";
+            
+            try {
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: cameraId })
                 });
-            }, 600); // Frecuencia de 600ms ligera para no sobrecalentar la RPi 3 B+
+                const result = await res.json();
+                
+                if (result.status === "success") {
+                    showToast("Grabadora", result.message, "success");
+                    pollRecordingsStatus();
+                    loadRecordings();
+                } else {
+                    showToast("Error", result.message, "error");
+                }
+            } catch (e) {
+                showToast("Error", "No se pudo comunicar con el servidor de cámara.", "error");
+            }
         }
 
-        function stopCameraStreams() {
-            if (cameraInterval) {
-                clearInterval(cameraInterval);
-                cameraInterval = null;
+        // Consulta estado de grabación y actualiza temporizadores
+        async function pollRecordingsStatus() {
+            const imgs = document.querySelectorAll("[id^='record-btn-']");
+            for (let btn of imgs) {
+                const cameraId = btn.id.replace("record-btn-", "");
+                try {
+                    const res = await fetch(`/api/camera/record/status?id=${cameraId}`);
+                    const status = await res.json();
+                    
+                    const badge = document.getElementById(`recording-badge-${cameraId}`);
+                    const timer = document.getElementById(`recording-timer-${cameraId}`);
+                    
+                    if (status.is_recording) {
+                        // Cambiar botón a Detener
+                        btn.className = "px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2";
+                        btn.innerHTML = `<i class="fa-solid fa-square text-[8px]"></i> Detener Grabación`;
+                        
+                        // Mostrar Badge y Temporizador
+                        badge.classList.remove("hidden");
+                        
+                        const mins = String(Math.floor(status.elapsed_time / 60)).padStart(2, '0');
+                        const secs = String(status.elapsed_time % 60).padStart(2, '0');
+                        timer.innerText = `${mins}:${secs}`;
+                    } else {
+                        // Cambiar botón a Iniciar
+                        btn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2";
+                        btn.innerHTML = `<i class="fa-solid fa-circle text-[8px] text-red-400 animate-pulse"></i> Iniciar Grabación`;
+                        badge.classList.add("hidden");
+                    }
+                } catch (e) {
+                    console.error("Error al consultar estado de grabación:", e);
+                }
+            }
+        }
+
+        // Cargar grabaciones guardadas en disco
+        async function loadRecordings() {
+            const tbody = document.getElementById("recordings-list");
+            try {
+                const res = await fetch("/api/camera/recordings");
+                const files = await res.json();
+                
+                if (!files || files.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="2" class="py-8 text-center text-gray-500 text-xs">No hay grabaciones de video guardadas en la Raspberry Pi.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = files.map(file => `
+                    <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
+                        <td class="py-3.5 px-4 font-bold text-gray-300 code-font flex items-center gap-2">
+                            <i class="fa-solid fa-file-video text-indigo-400"></i> ${file}
+                        </td>
+                        <td class="py-3.5 px-4 text-right">
+                            <a href="/api/camera/recordings/download?file=${file}" class="px-3 py-1.5 bg-indigo-600/15 hover:bg-indigo-600/30 border border-indigo-500/20 text-indigo-300 hover:text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5">
+                                <i class="fa-solid fa-download"></i> Descargar
+                            </a>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="2" class="py-8 text-center text-red-500 text-xs">Error cargando lista de grabaciones.</td></tr>`;
+            }
+        }
+
+        function startStatusPolling() {
+            stopStatusPolling();
+            recordingStatusInterval = setInterval(pollRecordingsStatus, 1000);
+        }
+
+        function stopStatusPolling() {
+            if (recordingStatusInterval) {
+                clearInterval(recordingStatusInterval);
+                recordingStatusInterval = null;
             }
         }
 

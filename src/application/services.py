@@ -1,5 +1,4 @@
-from typing import List
-from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient
+from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient, RecordingStatus
 from src.application.ports.inputs import (
     GetSystemStatusUseCase,
     ToggleGuiUseCase,
@@ -8,7 +7,11 @@ from src.application.ports.inputs import (
     DeployAppUseCase,
     GetCamerasUseCase,
     CaptureCameraFrameUseCase,
-    GetWifiClientsUseCase
+    GetWifiClientsUseCase,
+    StartRecordingUseCase,
+    StopRecordingUseCase,
+    GetRecordingStatusUseCase,
+    ListRecordingsUseCase
 )
 from src.application.ports.outputs import (
     SystemMetricsRepositoryPort,
@@ -66,20 +69,6 @@ class DeploymentService(DeployAppUseCase):
         message = "¡Despliegue completado!" if success else "Error durante el despliegue"
         return DeploymentResult(success=success, log=log, message=message)
 
-class CameraService(GetCamerasUseCase, CaptureCameraFrameUseCase):
-    def __init__(self, camera_port: CameraPort):
-        self._camera_port = camera_port
-
-    def execute_list(self) -> List[CameraInfo]:
-        # Implementa GetCamerasUseCase.
-        # Python abstract classes permit different implementation method names or matching signature.
-        # We will use execute() for Use Cases or separate methods depending on design.
-        return self._camera_port.list_cameras()
-
-    # To satisfy both interfaces under a clean Execute structure:
-    # We will split it into two Use Cases to follow Single Responsibility Principle.
-    pass
-
 class GetCamerasService(GetCamerasUseCase):
     def __init__(self, camera_port: CameraPort):
         self._camera_port = camera_port
@@ -100,3 +89,31 @@ class GetWifiClientsService(GetWifiClientsUseCase):
 
     def execute(self) -> List[WifiClient]:
         return self._network_port.list_wifi_clients()
+
+class StartRecordingService(StartRecordingUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self, camera_id: str) -> tuple[bool, str]:
+        return self._camera_port.start_recording(camera_id)
+
+class StopRecordingService(StopRecordingUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self, camera_id: str) -> tuple[bool, str]:
+        return self._camera_port.stop_recording(camera_id)
+
+class GetRecordingStatusService(GetRecordingStatusUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self, camera_id: str) -> RecordingStatus:
+        return self._camera_port.get_recording_status(camera_id)
+
+class ListRecordingsService(ListRecordingsUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self) -> List[str]:
+        return self._camera_port.list_recordings()

@@ -14,6 +14,6 @@ services:
       - /proc:/proc:ro
       - /sys:/sys:ro
       # Carpeta donde se clonarán y desplegarán las apps en el host (ajustar si es necesario)
-      - /home/frivera/apps:/root/apps
+      - ./apps:/root/apps
     environment:
       - PYTHONUNBUFFERED=1

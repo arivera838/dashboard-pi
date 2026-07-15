@@ -108,3 +108,18 @@ class WifiClient:
             "device": self.device,
             "hostname": self.hostname
         }
+
+@dataclass(frozen=True)
+class RecordingStatus:
+    camera_id: str
+    is_recording: bool
+    filepath: str
+    elapsed_time: int
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "camera_id": self.camera_id,
+            "is_recording": self.is_recording,
+            "filepath": self.filepath,
+            "elapsed_time": self.elapsed_time
+        }

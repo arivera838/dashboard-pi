@@ -19,7 +19,11 @@ from src.application.services import (
     DeploymentService,
     GetCamerasService,
     CaptureCameraFrameService,
-    GetWifiClientsService
+    GetWifiClientsService,
+    StartRecordingService,
+    StopRecordingService,
+    GetRecordingStatusService,
+    ListRecordingsService
 )
 from src.adapters.inbound.web_server import WebServer
 
@@ -43,6 +47,11 @@ def main():
     get_cameras_service = GetCamerasService(camera_adapter)
     capture_frame_service = CaptureCameraFrameService(camera_adapter)
     get_wifi_clients_service = GetWifiClientsService(network_adapter)
+    
+    start_recording_service = StartRecordingService(camera_adapter)
+    stop_recording_service = StopRecordingService(camera_adapter)
+    get_recording_status_service = GetRecordingStatusService(camera_adapter)
+    list_recordings_service = ListRecordingsService(camera_adapter)
 
     # 3. Instanciar y arrancar adaptador de entrada (servidor web) inyectando los casos de uso
     server = WebServer(
@@ -54,7 +63,11 @@ def main():
         deploy_use_case=deploy_service,
         get_cameras_use_case=get_cameras_service,
         capture_frame_use_case=capture_frame_service,
-        get_wifi_clients_use_case=get_wifi_clients_service
+        get_wifi_clients_use_case=get_wifi_clients_service,
+        start_recording_use_case=start_recording_service,
+        stop_recording_use_case=stop_recording_service,
+        get_recording_status_use_case=get_recording_status_service,
+        list_recordings_use_case=list_recordings_service
     )
 
     server.start()

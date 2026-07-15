@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from src.domain.models import SystemMetrics, DockerContainer, CameraInfo, WifiClient
+from src.domain.models import SystemMetrics, DockerContainer, CameraInfo, WifiClient, RecordingStatus
 
 class SystemMetricsRepositoryPort(ABC):
     @abstractmethod
@@ -41,6 +41,22 @@ class CameraPort(ABC):
 
     @abstractmethod
     def capture_frame(self, camera_id: str) -> bytes:
+        pass
+
+    @abstractmethod
+    def start_recording(self, camera_id: str) -> tuple[bool, str]:
+        pass
+
+    @abstractmethod
+    def stop_recording(self, camera_id: str) -> tuple[bool, str]:
+        pass
+
+    @abstractmethod
+    def get_recording_status(self, camera_id: str) -> RecordingStatus:
+        pass
+
+    @abstractmethod
+    def list_recordings(self) -> List[str]:
         pass
 
 class NetworkPort(ABC):
