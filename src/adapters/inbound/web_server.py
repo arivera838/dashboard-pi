@@ -19,7 +19,8 @@ from src.application.ports.inputs import (
     GetRecordingStatusUseCase,
     ListRecordingsUseCase,
     GetVisionSettingsUseCase,
-    UpdateVisionSettingsUseCase
+    UpdateVisionSettingsUseCase,
+    SaveClientAliasUseCase
 )
 
 def create_handler_class(
@@ -36,7 +37,8 @@ def create_handler_class(
     get_recording_status_use_case: GetRecordingStatusUseCase,
     list_recordings_use_case: ListRecordingsUseCase,
     get_vision_settings_use_case: GetVisionSettingsUseCase,
-    update_vision_settings_use_case: UpdateVisionSettingsUseCase
+    update_vision_settings_use_case: UpdateVisionSettingsUseCase,
+    save_client_alias_use_case: SaveClientAliasUseCase
 ):
     class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -281,6 +283,16 @@ def create_handler_class(
                 success, msg = update_vision_settings_use_case.execute(face_enabled, hand_enabled)
                 response_data = {"status": "success" if success else "error", "message": msg}
 
+            # 7. API POST: Guardar alias de cliente de red
+            elif url_parsed.path == "/api/network/alias":
+                mac = params.get("mac")
+                alias = params.get("alias")
+                if mac and alias is not None:
+                    success, msg = save_client_alias_use_case.execute(mac, alias)
+                    response_data = {"status": "success" if success else "error", "message": msg}
+                else:
+                    response_data = {"status": "error", "message": "Faltan parametros mac o alias"}
+
             self.wfile.write(json.dumps(response_data).encode("utf-8"))
 
     return DashboardRequestHandler
@@ -303,7 +315,8 @@ class WebServer:
         get_recording_status_use_case: GetRecordingStatusUseCase,
         list_recordings_use_case: ListRecordingsUseCase,
         get_vision_settings_use_case: GetVisionSettingsUseCase,
-        update_vision_settings_use_case: UpdateVisionSettingsUseCase
+        update_vision_settings_use_case: UpdateVisionSettingsUseCase,
+        save_client_alias_use_case: SaveClientAliasUseCase
     ):
         self.port = port
         self.handler_class = create_handler_class(
@@ -320,7 +333,8 @@ class WebServer:
             get_recording_status_use_case,
             list_recordings_use_case,
             get_vision_settings_use_case,
-            update_vision_settings_use_case
+            update_vision_settings_use_case,
+            save_client_alias_use_case
         )
 
     def start(self):

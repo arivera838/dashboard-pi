@@ -56,11 +56,7 @@ class SubprocessCameraAdapter(CameraPort):
         
         # Inicializar clasificadores si OpenCV está disponible
         if OPENCV_AVAILABLE:
-            try:
-                self._face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            except Exception as e:
-                print(f"[Vision] No se pudo cargar Haar Cascades para Rostros: {e}")
-            
+            self._load_face_cascade()
             self._start_all_captures()
 
         # Inicializar MediaPipe si está disponible
@@ -300,6 +296,47 @@ class SubprocessCameraAdapter(CameraPort):
                                 self._mp_draw.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=2),
                                 self._mp_draw.DrawingSpec(color=(59, 130, 246), thickness=2)
                             )
+                            
+                            # Clasificación de Gestos en base a Landmarks
+                            try:
+                                tip_ids = [8, 12, 16, 20]   # Índice, Medio, Anular, Meñique
+                                pip_ids = [6, 10, 14, 18]   # Nodos de referencia
+                                fingers_open = []
+                                
+                                # Pulgar
+                                if hand_landmarks.landmark[4].x < hand_landmarks.landmark[2].x:
+                                    fingers_open.append(True)
+                                else:
+                                    fingers_open.append(False)
+                                    
+                                # Otros 4 dedos
+                                for tip, pip in zip(tip_ids, pip_ids):
+                                    if hand_landmarks.landmark[tip].y < hand_landmarks.landmark[pip].y:
+                                        fingers_open.append(True)
+                                    else:
+                                        fingers_open.append(False)
+                                        
+                                # Determinar Gesto
+                                gesture = "MANO"
+                                total_open = sum(fingers_open)
+                                
+                                if total_open == 0:
+                                    gesture = "PUNO (Fist)"
+                                elif total_open == 5:
+                                    gesture = "PALMA ABIERTA (Open Hand)"
+                                elif fingers_open[1] and fingers_open[2] and not fingers_open[0] and not fingers_open[3] and not fingers_open[4]:
+                                    gesture = "AMOR Y PAZ (Peace)"
+                                elif fingers_open[0] and total_open == 1:
+                                    gesture = "BIEN (Like / Thumbs Up)"
+                                elif fingers_open[1] and total_open == 1:
+                                    gesture = "SENALANDO (Pointing)"
+                                
+                                # Dibujar Gesto en el frame flotando sobre la muñeca
+                                x_wrist = int(hand_landmarks.landmark[0].x * frame.shape[1])
+                                y_wrist = int(hand_landmarks.landmark[0].y * frame.shape[0])
+                                cv2.putText(frame, gesture, (x_wrist - 40, y_wrist + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (59, 130, 246), 2, cv2.LINE_AA)
+                            except Exception:
+                                pass
                 except Exception as e:
                     pass
             else:
@@ -314,6 +351,35 @@ class SubprocessCameraAdapter(CameraPort):
                     1, 
                     cv2.LINE_AA
                 )
+
+    def _load_face_cascade(self):
+        cascade_filename = "haarcascade_frontalface_default.xml"
+        if not os.path.exists(cascade_filename):
+            try:
+                import urllib.request
+                url = "https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml"
+                print(f"[Vision] Descargando Haar Cascade de Rostros desde GitHub...")
+                # Timeout de 5s para evitar bloqueos prolongados
+                urllib.request.urlretrieve(url, cascade_filename)
+                print(f"[Vision] Descarga completada.")
+            except Exception as e:
+                print(f"[Vision] Error al descargar cascade: {e}")
+        
+        if os.path.exists(cascade_filename):
+            self._face_cascade = cv2.CascadeClassifier(cascade_filename)
+            if not self._face_cascade.empty():
+                print("[Vision] Haar Cascade de Rostros cargado correctamente desde archivo local.")
+                return
+                
+        # Fallback al path por defecto de OpenCV
+        try:
+            self._face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            if not self._face_cascade.empty():
+                print("[Vision] Haar Cascade de Rostros cargado desde cv2.data.haarcascades.")
+                return
+        except Exception:
+            pass
+        print("[Vision] ADVERTENCIA: No se pudo cargar ningún Haar Cascade para rostros.")
 
     def list_cameras(self) -> List[CameraInfo]:
         devices = self._scan_hardware_cameras()

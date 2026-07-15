@@ -71,3 +71,8 @@ class UpdateVisionSettingsUseCase(ABC):
     @abstractmethod
     def execute(self, face_enabled: bool, hand_enabled: bool) -> tuple[bool, str]:
         pass
+
+class SaveClientAliasUseCase(ABC):
+    @abstractmethod
+    def execute(self, mac: str, alias: str) -> tuple[bool, str]:
+        pass

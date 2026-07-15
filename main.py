@@ -25,7 +25,8 @@ from src.application.services import (
     GetRecordingStatusService,
     ListRecordingsService,
     GetVisionSettingsService,
-    UpdateVisionSettingsService
+    UpdateVisionSettingsService,
+    SaveClientAliasService
 )
 from src.adapters.inbound.web_server import WebServer
 
@@ -56,6 +57,7 @@ def main():
     list_recordings_service = ListRecordingsService(camera_adapter)
     get_vision_settings_service = GetVisionSettingsService(camera_adapter)
     update_vision_settings_service = UpdateVisionSettingsService(camera_adapter)
+    save_client_alias_service = SaveClientAliasService(network_adapter)
 
     # 3. Instanciar y arrancar adaptador de entrada (servidor web) inyectando los casos de uso
     server = WebServer(
@@ -73,7 +75,8 @@ def main():
         get_recording_status_use_case=get_recording_status_service,
         list_recordings_use_case=list_recordings_service,
         get_vision_settings_use_case=get_vision_settings_service,
-        update_vision_settings_use_case=update_vision_settings_service
+        update_vision_settings_use_case=update_vision_settings_service,
+        save_client_alias_use_case=save_client_alias_service
     )
 
     server.start()

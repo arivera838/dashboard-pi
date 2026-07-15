@@ -411,6 +411,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- Modal de Editar Nombre de Dispositivo (Alias) -->
+    <div id="alias-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden mx-4">
+            <div class="px-6 py-4 border-b border-gray-800 bg-gray-950/40 flex justify-between items-center">
+                <h3 class="font-bold text-white text-base">Editar Nombre de Dispositivo</h3>
+                <button onclick="closeAliasModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Dirección MAC</label>
+                    <input type="text" id="alias-mac" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-gray-400 code-font outline-none" readonly>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Nombre Personalizado (Alias)</label>
+                    <input type="text" id="alias-name" class="w-full bg-gray-950 border border-gray-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors" placeholder="Ej. Mi Laptop Principal">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button onclick="closeAliasModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-bold transition-all">Cancelar</button>
+                    <button onclick="saveAlias()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Script de lógica e interacción en el Frontend -->
     <script>
         let activeTab = "dashboard";
@@ -853,6 +877,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         // --- MÉTODOS DE RED WIFI ---
+        function getDeviceIcon(hostname) {
+            const name = (hostname || "").toLowerCase();
+            if (name.includes("phone") || name.includes("android") || name.includes("iphone") || name.includes("smart")) return "fa-mobile-button text-emerald-400";
+            if (name.includes("ipad") || name.includes("tablet")) return "fa-tablet-screen-button text-teal-400";
+            if (name.includes("laptop") || name.includes("macbook") || name.includes("notebook") || name.includes("pc-") || name.includes("desktop")) return "fa-laptop text-indigo-400";
+            if (name.includes("tv") || name.includes("roku") || name.includes("chromecast") || name.includes("smarttv") || name.includes("television")) return "fa-tv text-purple-400";
+            if (name.includes("printer") || name.includes("epson") || name.includes("hp")) return "fa-print text-amber-400";
+            if (name.includes("raspberry") || name.includes("pi")) return "fa-microchip text-rose-400";
+            return "fa-laptop-code text-gray-400";
+        }
+
         async function refreshNetworkClients() {
             const tbody = document.getElementById("network-clients-list");
             tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-500 text-xs">Escaneando red local...</td></tr>`;
@@ -867,7 +902,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 tbody.innerHTML = clients.map(client => `
                     <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
-                        <td class="py-3.5 px-4 font-bold text-gray-200">${client.hostname}</td>
+                        <td class="py-3.5 px-4 font-bold text-gray-200">
+                            <div class="flex items-center justify-between">
+                                <span class="flex items-center gap-2">
+                                    <i class="fa-solid ${getDeviceIcon(client.hostname)} text-sm"></i>
+                                    ${client.hostname}
+                                </span>
+                                <button onclick="openAliasModal('${client.mac}', '${client.hostname}')" class="p-1 hover:bg-gray-800 rounded text-gray-500 hover:text-white transition-colors" title="Editar Nombre">
+                                    <i class="fa-solid fa-pencil text-xs"></i>
+                                </button>
+                            </div>
+                        </td>
                         <td class="py-3.5 px-4 code-font text-emerald-400">${client.ip}</td>
                         <td class="py-3.5 px-4 code-font text-gray-400">${client.mac}</td>
                         <td class="py-3.5 px-4 text-xs font-semibold text-gray-500 uppercase">${client.device}</td>
@@ -875,6 +920,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 `).join('');
             } catch (err) {
                 tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500 text-xs">Error cargando clientes de red.</td></tr>`;
+            }
+        }
+
+        // Control del Modal de Alias
+        function openAliasModal(mac, currentAlias) {
+            document.getElementById("alias-mac").value = mac;
+            document.getElementById("alias-name").value = currentAlias === "Dispositivo sin nombre" ? "" : currentAlias;
+            document.getElementById("alias-modal").classList.remove("hidden");
+        }
+
+        function closeAliasModal() {
+            document.getElementById("alias-modal").classList.add("hidden");
+        }
+
+        async function saveAlias() {
+            const mac = document.getElementById("alias-mac").value;
+            const alias = document.getElementById("alias-name").value;
+
+            try {
+                const res = await fetch("/api/network/alias", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ mac, alias })
+                });
+                const result = await res.json();
+                if (result.status === "success") {
+                    showToast("Red WiFi", "Nombre personalizado guardado correctamente", "success");
+                    closeAliasModal();
+                    refreshNetworkClients();
+                } else {
+                    showToast("Error", result.message, "error");
+                }
+            } catch (err) {
+                showToast("Error", "No se pudo comunicar con el servidor.", "error");
             }
         }
 

@@ -14,7 +14,8 @@ from src.application.ports.inputs import (
     GetRecordingStatusUseCase,
     ListRecordingsUseCase,
     GetVisionSettingsUseCase,
-    UpdateVisionSettingsUseCase
+    UpdateVisionSettingsUseCase,
+    SaveClientAliasUseCase
 )
 from src.application.ports.outputs import (
     SystemMetricsRepositoryPort,
@@ -135,3 +136,13 @@ class UpdateVisionSettingsService(UpdateVisionSettingsUseCase):
     def execute(self, face_enabled: bool, hand_enabled: bool) -> tuple[bool, str]:
         self._camera_port.set_vision_settings(face_enabled, hand_enabled)
         return True, "Ajustes de visión artificial actualizados"
+
+class SaveClientAliasService(SaveClientAliasUseCase):
+    def __init__(self, network_port: NetworkPort):
+        self._network_port = network_port
+
+    def execute(self, mac: str, alias: str) -> tuple[bool, str]:
+        success = self._network_port.save_client_alias(mac, alias)
+        if success:
+            return True, f"Alias guardado con éxito para {mac}"
+        return False, "No se pudo guardar el alias para este dispositivo"

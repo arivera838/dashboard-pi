@@ -3,6 +3,7 @@ import socket
 import subprocess
 import threading
 import time
+import json
 from typing import List, Dict
 from src.domain.models import WifiClient
 from src.application.ports.outputs import NetworkPort
@@ -10,14 +11,38 @@ from src.application.ports.outputs import NetworkPort
 class LinuxNetworkAdapter(NetworkPort):
     _last_scan_time = 0.0
     _scan_lock = threading.Lock()
+    _aliases_file = "./recordings/network_aliases.json"
 
     def __init__(self):
         # Iniciar primer barrido de red en segundo plano al arrancar
         threading.Thread(target=self._async_ping_sweep, daemon=True).start()
 
+    def _load_aliases(self) -> Dict[str, str]:
+        if os.path.exists(self._aliases_file):
+            try:
+                with open(self._aliases_file, "r") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {}
+
+    def save_client_alias(self, mac: str, alias: str) -> bool:
+        aliases = self._load_aliases()
+        aliases[mac.lower()] = alias
+        try:
+            # Asegurar directorio de recordings por si acaso
+            os.makedirs(os.path.dirname(self._aliases_file), exist_ok=True)
+            with open(self._aliases_file, "w") as f:
+                json.dump(aliases, f)
+            return True
+        except Exception as e:
+            print(f"[Network] Error al guardar alias: {e}")
+            return False
+
     def list_wifi_clients(self) -> List[WifiClient]:
         clients = []
         hostnames: Dict[str, str] = {}
+        aliases = self._load_aliases()
 
         # Lanzar barrido de red si han pasado más de 120 segundos desde el último escaneo
         if time.time() - self._last_scan_time > 120:
@@ -54,11 +79,16 @@ class LinuxNetworkAdapter(NetworkPort):
 
                             # Filtrar entradas incompletas, vacías y loopbacks
                             if flags != "0x0" and mac != "00:00:00:00:00:00" and not ip.startswith("127."):
-                                # Si no tiene nombre por lease, intentar resolución inversaDNS local ultra rápida
-                                hostname = hostnames.get(mac)
+                                # Prioridad 1: Alias guardado por el usuario
+                                hostname = aliases.get(mac)
+                                
+                                # Prioridad 2: Lease de dnsmasq
+                                if not hostname:
+                                    hostname = hostnames.get(mac)
+                                
+                                # Prioridad 3: Resolución inversa DNS local
                                 if not hostname:
                                     try:
-                                        # Timeout de 0.2s para evitar colgar el listado
                                         socket.setdefaulttimeout(0.2)
                                         hostname = socket.gethostbyaddr(ip)[0]
                                     except Exception:
@@ -73,19 +103,21 @@ class LinuxNetworkAdapter(NetworkPort):
             except Exception as e:
                 print(f"[Network] Error al leer tabla ARP: {e}")
 
-        # 3. Si no hay dispositivos detectados (ej: macOS en desarrollo local), inyectar mocks
+        # 3. Si no hay dispositivos detectados (ej: macOS en desarrollo local), inyectar mocks con alias si los hay
         if not clients:
+            mock1_mac = "ac:37:43:11:aa:bb"
+            mock2_mac = "00:11:22:33:44:55"
             clients.append(WifiClient(
                 ip="192.168.1.55",
-                mac="ac:37:43:11:aa:bb",
+                mac=mock1_mac,
                 device="wlan0",
-                hostname="Smart-Hotspot-User"
+                hostname=aliases.get(mock1_mac, "Smart-Hotspot-User")
             ))
             clients.append(WifiClient(
                 ip="192.168.1.92",
-                mac="00:11:22:33:44:55",
+                mac=mock2_mac,
                 device="wlan0",
-                hostname="iPhone-Mariana"
+                hostname=aliases.get(mock2_mac, "iPhone-Mariana")
             ))
 
         return clients

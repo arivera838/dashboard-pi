@@ -71,3 +71,7 @@ class NetworkPort(ABC):
     @abstractmethod
     def list_wifi_clients(self) -> List[WifiClient]:
         pass
+
+    @abstractmethod
+    def save_client_alias(self, mac: str, alias: str) -> bool:
+        pass
