@@ -8,7 +8,7 @@ class GetSystemStatusUseCase(ABC):
 
 class ToggleGuiUseCase(ABC):
     @abstractmethod
-    def execute(self, action: str) -> bool:
+    def execute(self, action: str) -> tuple[bool, str]:
         pass
 
 class ControlDockerContainerUseCase(ABC):

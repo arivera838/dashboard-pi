@@ -13,11 +13,7 @@ class GuiControllerPort(ABC):
         pass
 
     @abstractmethod
-    def start_gui(self) -> bool:
-        pass
-
-    @abstractmethod
-    def stop_gui(self) -> bool:
+    def execute_action(self, action: str) -> tuple[bool, str]:
         pass
 
 class DockerControllerPort(ABC):

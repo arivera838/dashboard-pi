@@ -61,15 +61,10 @@ def create_handler_class(
 
             response_data = {"status": "error", "message": "Acción no reconocida"}
 
-            # 1. API POST: Alternar la Interfaz de Escritorio (Desktop)
             if url_parsed.path == "/api/gui/toggle":
                 action = params.get("action", "")
-                success = gui_use_case.execute(action)
-                if success:
-                    msg = "Interfaz gráfica iniciada temporalmente." if action == "start" else "Interfaz gráfica detenida para ahorrar RAM."
-                    response_data = {"status": "success", "message": msg}
-                else:
-                    response_data = {"status": "error", "message": "Fallo al ejecutar acción en la interfaz gráfica."}
+                success, msg = gui_use_case.execute(action)
+                response_data = {"status": "success" if success else "error", "message": msg}
 
             # 2. API POST: Controlar Contenedores Docker (Start/Stop/Restart)
             elif url_parsed.path == "/api/docker/control":

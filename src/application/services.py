@@ -34,12 +34,8 @@ class GuiService(ToggleGuiUseCase):
     def __init__(self, gui_controller: GuiControllerPort):
         self._gui_controller = gui_controller
 
-    def execute(self, action: str) -> bool:
-        if action == "start":
-            return self._gui_controller.start_gui()
-        elif action == "stop":
-            return self._gui_controller.stop_gui()
-        return False
+    def execute(self, action: str) -> tuple[bool, str]:
+        return self._gui_controller.execute_action(action)
 
 class DockerService(ControlDockerContainerUseCase):
     def __init__(self, docker_controller: DockerControllerPort):
