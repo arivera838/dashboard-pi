@@ -112,7 +112,7 @@ class SubprocessCameraAdapter(CameraPort):
                     continue
                 
                 # Identificar si es la cámara CSI Flex basándose en los controladores de la RPi
-                is_csi = any(x in name_lower for x in ["unicam", "rpivid", "imx219", "ov5647", "imx708", "libcameradev", "camera-nativa"])
+                is_csi = any(x in name_lower for x in ["unicam", "rpivid", "imx219", "ov5647", "imx708", "libcameradev", "camera-nativa", "bcm2835"])
                 
                 detected.append({
                     "index": i,
