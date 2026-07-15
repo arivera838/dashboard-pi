@@ -172,6 +172,22 @@ class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(data).encode("utf-8"))
             return
 
+        # 1.1 API: Obtener Logs de Contenedor Docker (JSON)
+        if url_parsed.path == "/api/docker/logs":
+            query_params = parse_qs(url_parsed.query)
+            container_id = query_params.get("id", [None])[0]
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            if container_id:
+                res = subprocess.run(["docker", "logs", "--tail", "200", container_id], capture_output=True, text=True)
+                logs_output = res.stdout + res.stderr
+                response_data = {"status": "success", "logs": logs_output}
+            else:
+                response_data = {"status": "error", "message": "Falta el ID del contenedor"}
+            self.wfile.write(json.dumps(response_data).encode("utf-8"))
+            return
+
         # 2. Servir la interfaz gráfica principal
         if url_parsed.path == "/":
             self.send_response(200)
@@ -209,14 +225,16 @@ class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
                 res = subprocess.run(["sudo", "systemctl", "stop", "lightdm"], capture_output=True, text=True)
                 response_data = {"status": "success", "message": "Interfaz gráfica detenida para ahorrar RAM."}
 
-        # 2. API POST: Controlar Contenedores Docker (Start/Stop/Restart)
+        # 2. API POST: Controlar Contenedores Docker (Start/Stop/Restart/Remove)
         elif url_parsed.path == "/api/docker/control":
             container_id = params.get("id")
-            action = params.get("action") # start, stop, restart
-            if container_id and action in ["start", "stop", "restart"]:
-                res = subprocess.run(["docker", action, container_id], capture_output=True, text=True)
+            action = params.get("action") # start, stop, restart, remove
+            if container_id and action in ["start", "stop", "restart", "remove"]:
+                cmd = ["docker", "rm", "-f", container_id] if action == "remove" else ["docker", action, container_id]
+                res = subprocess.run(cmd, capture_output=True, text=True)
                 if res.returncode == 0:
-                    response_data = {"status": "success", "message": f"Contenedor {action}eado con éxito."}
+                    action_msg = "eliminado" if action == "remove" else f"{action}eado"
+                    response_data = {"status": "success", "message": f"Contenedor {action_msg} con éxito."}
                 else:
                     response_data = {"status": "error", "message": res.stderr}
 
@@ -513,6 +531,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- Modal de Logs de Docker -->
+    <div id="logs-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden mx-4">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-gray-950/40">
+                <div class="flex items-center gap-2 text-sky-400">
+                    <i class="fa-solid fa-terminal text-lg"></i>
+                    <h3 class="font-bold text-white text-base">Logs del Contenedor: <span id="modal-container-name" class="text-sky-400"></span></h3>
+                </div>
+                <button onclick="closeLogsModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto flex-1 bg-gray-950">
+                <pre id="modal-logs-content" class="text-xs text-emerald-400 code-font whitespace-pre-wrap select-text"></pre>
+            </div>
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-gray-800 flex justify-end bg-gray-950/40">
+                <button onclick="closeLogsModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white font-bold text-sm rounded-lg transition-colors">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Script de lógica e interacción en el Frontend -->
     <script>
         // Formateadores de Bytes
@@ -606,6 +650,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <button onclick="controlDocker('${c.id}', 'restart')" class="p-1.5 bg-gray-800 hover:bg-indigo-500/15 text-gray-400 hover:text-indigo-400 rounded-lg text-xs transition-colors" title="Reiniciar">
                                 <i class="fa-solid fa-arrows-rotate"></i>
                             </button>
+                            <button onclick="showDockerLogs('${c.id}', '${c.name}')" class="p-1.5 bg-gray-800 hover:bg-sky-500/15 text-gray-400 hover:text-sky-400 rounded-lg text-xs transition-colors" title="Ver Logs">
+                                <i class="fa-solid fa-file-lines"></i>
+                            </button>
+                            <button onclick="controlDocker('${c.id}', 'remove')" class="p-1.5 bg-gray-800 hover:bg-red-500/15 text-gray-400 hover:text-red-500 rounded-lg text-xs transition-colors" title="Eliminar">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -614,6 +664,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Acciones Docker
         async function controlDocker(id, action) {
+            if (action === "remove") {
+                if (!confirm("¿Estás seguro de que deseas eliminar este contenedor de forma permanente?")) {
+                    return;
+                }
+            }
             try {
                 const res = await fetch("/api/docker/control", {
                     method: "POST",
@@ -630,6 +685,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             } catch (e) {
                 showToast("Error", "No se pudo comunicar con el servidor.", "error");
             }
+        }
+
+        // Logs de Docker
+        async function showDockerLogs(id, name) {
+            document.getElementById("modal-container-name").innerText = name;
+            document.getElementById("modal-logs-content").innerText = "Cargando logs...";
+            document.getElementById("logs-modal").classList.remove("hidden");
+            try {
+                const res = await fetch(`/api/docker/logs?id=${id}`);
+                const data = await res.json();
+                if (data.status === "success") {
+                    document.getElementById("modal-logs-content").innerText = data.logs || "No hay logs registrados para este contenedor.";
+                } else {
+                    document.getElementById("modal-logs-content").innerText = data.message || "Error al leer logs.";
+                }
+            } catch (err) {
+                document.getElementById("modal-logs-content").innerText = "Error de conexión al cargar los logs.";
+            }
+        }
+
+        function closeLogsModal() {
+            document.getElementById("logs-modal").classList.add("hidden");
         }
 
         // Acciones Desktop GUI (lightdm)
