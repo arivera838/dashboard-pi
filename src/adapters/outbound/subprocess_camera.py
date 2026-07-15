@@ -1,6 +1,8 @@
 import os
+import sys
 import time
 import threading
+from contextlib import contextmanager
 from typing import List, Dict
 from src.domain.models import CameraInfo, RecordingStatus
 from src.application.ports.outputs import CameraPort
@@ -28,6 +30,9 @@ class SubprocessCameraAdapter(CameraPort):
     _recording_start: Dict[str, float] = {}
     _recording_path: Dict[str, str] = {}
     _recordings_dir = "./recordings"
+    
+    # Mapeo de índices de hardware
+    _camera_device_indices: Dict[str, int] = {}
 
     def __init__(self):
         # Crear directorio de grabaciones
@@ -44,11 +49,13 @@ class SubprocessCameraAdapter(CameraPort):
             if os.path.exists(dev_path):
                 if i % 2 == 0:
                     cam_id = f"usb{i}"
+                    self._camera_device_indices[cam_id] = i
                     self._start_camera_thread(cam_id, i)
                     usb_indices.append(i)
 
         # Arrancar siempre la cámara CSI (si está conectada, usará GStreamer o el índice libre)
         csi_index = 0 if not usb_indices else (max(usb_indices) + 1)
+        self._camera_device_indices["csi"] = csi_index
         self._start_camera_thread("csi", csi_index)
 
     def _start_camera_thread(self, camera_id: str, device_index: int):
@@ -66,6 +73,22 @@ class SubprocessCameraAdapter(CameraPort):
             self._threads[camera_id] = thread
             thread.start()
 
+    @contextmanager
+    def _silence_stderr(self):
+        try:
+            stderr_fd = sys.stderr.fileno()
+            saved_stderr_fd = os.dup(stderr_fd)
+            try:
+                t_fd = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(t_fd, stderr_fd)
+                os.close(t_fd)
+                yield
+            finally:
+                os.dup2(saved_stderr_fd, stderr_fd)
+                os.close(saved_stderr_fd)
+        except Exception:
+            yield
+
     def _capture_loop(self, camera_id: str, device_index: int):
         print(f"[Camera] Iniciando captura continua para {camera_id} (Dispositivo {device_index})")
         cap = None
@@ -77,7 +100,8 @@ class SubprocessCameraAdapter(CameraPort):
                     if camera_id == "csi":
                         # Intentar GStreamer libcamerasrc para cámara CSI nativa (RPi OS Bullseye/Bookworm)
                         gst_pipeline = "libcamerasrc ! video/x-raw, width=640, height=480, framerate=25/1 ! videoconvert ! appsink drop=true sync=false"
-                        cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+                        with self._silence_stderr():
+                            cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
                         if not cap.isOpened():
                             # Fallback si GStreamer no está disponible
                             cap = cv2.VideoCapture(device_index)
@@ -148,6 +172,26 @@ class SubprocessCameraAdapter(CameraPort):
         except Exception:
             pass
 
+        # Alternativa para RPi OS Bullseye/Bookworm con libcamera
+        if not csi_detected:
+            try:
+                import subprocess
+                res = subprocess.run(["libcamera-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
+                # Si hay cámaras disponibles en el stderr/stdout
+                if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "Available cameras" in res.stderr or "/base/soc/" in res.stdout or "/base/soc/" in res.stderr):
+                    csi_detected = True
+            except Exception:
+                pass
+
+        if not csi_detected:
+            try:
+                import subprocess
+                res = subprocess.run(["rpicam-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
+                if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "Available cameras" in res.stderr):
+                    csi_detected = True
+            except Exception:
+                pass
+
         if csi_detected:
             cameras.append(CameraInfo(
                 id="csi",
@@ -176,10 +220,7 @@ class SubprocessCameraAdapter(CameraPort):
 
         if OPENCV_AVAILABLE:
             if camera_id not in self._threads or not self._threads[camera_id].is_alive():
-                try:
-                    dev_index = int(camera_id.replace("usb", ""))
-                except Exception:
-                    dev_index = 0
+                dev_index = self._camera_device_indices.get(camera_id, 0)
                 self._start_camera_thread(camera_id, dev_index)
 
             with self._lock:
@@ -209,10 +250,7 @@ class SubprocessCameraAdapter(CameraPort):
 
         # Asegurar de que la cámara está corriendo
         if camera_id not in self._threads or not self._threads[camera_id].is_alive():
-            try:
-                dev_index = int(camera_id.replace("usb", ""))
-            except Exception:
-                dev_index = 0
+            dev_index = self._camera_device_indices.get(camera_id, 0)
             self._start_camera_thread(camera_id, dev_index)
 
         with self._lock:
