@@ -78,3 +78,31 @@ class DeploymentResult:
             "message": self.message,
             "log": self.log
         }
+
+@dataclass(frozen=True)
+class CameraInfo:
+    id: str
+    name: str
+    type: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type
+        }
+
+@dataclass(frozen=True)
+class WifiClient:
+    ip: str
+    mac: str
+    device: str
+    hostname: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ip": self.ip,
+            "mac": self.mac,
+            "device": self.device,
+            "hostname": self.hostname
+        }

@@ -51,7 +51,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </header>
 
     <main class="max-w-7xl mx-auto px-6 py-8">
-        <!-- Grid de Estado y Métricas -->
+        
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-gray-800 mb-8 gap-2">
+            <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition-all flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high"></i> Dashboard
+            </button>
+            <button onclick="switchTab('cameras')" id="tab-btn-cameras" class="px-5 py-3 border-b-2 border-transparent text-gray-400 hover:text-white font-bold text-sm transition-all flex items-center gap-2">
+                <i class="fa-solid fa-camera"></i> Cámaras
+            </button>
+            <button onclick="switchTab('network')" id="tab-btn-network" class="px-5 py-3 border-b-2 border-transparent text-gray-400 hover:text-white font-bold text-sm transition-all flex items-center gap-2">
+                <i class="fa-solid fa-wifi"></i> Clientes de Red
+            </button>
+        </div>
+
+        <!-- Grid de Estado y Métricas (Común para tener contexto de salud) -->
         <section class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             
             <!-- CPU Load Card -->
@@ -116,153 +130,195 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         </section>
 
-        <!-- Bloque Principal de Configuración y CI/CD -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            <!-- Columna Izquierda: Configuración Rápida & Almacenamiento -->
-            <div class="space-y-6 lg:col-span-1">
-                
-                <!-- Quick Settings -->
-                <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <h2 class="text-lg font-bold mb-5 flex items-center gap-2">
-                        <i class="fa-solid fa-sliders text-emerald-400"></i> Ajustes Rápidos
-                    </h2>
-                    
-                    <!-- Toggle GUI Command -->
-                    <div class="bg-gray-950 p-4 rounded-xl border border-gray-800/80 flex flex-col gap-3">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h3 class="font-bold text-sm text-white">Interfaz Gráfica (VNC)</h3>
-                                <p class="text-xs text-gray-400">Controla el servidor de ventanas Desktop.</p>
-                            </div>
-                            <span id="gui-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-gray-800 text-gray-400">Consultando...</span>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 mt-2">
-                            <button onclick="controlGUI('start')" class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-all text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-play"></i> Encender
-                            </button>
-                            <button onclick="controlGUI('stop')" class="px-3 py-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/20 active:scale-95 transition-all text-red-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-power-off"></i> Apagar RAM
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Host Information -->
-                    <div class="mt-6 space-y-3">
-                        <div class="flex justify-between text-xs py-2 border-b border-gray-800">
-                            <span class="text-gray-400">Host IP</span>
-                            <span class="code-font font-semibold text-emerald-400">192.168.1.22</span>
-                        </div>
-                        <div class="flex justify-between text-xs py-2 border-b border-gray-800">
-                            <span class="text-gray-400">Sistema Base</span>
-                            <span class="font-semibold text-gray-200">Linux (ARM 64-bit)</span>
-                        </div>
-                        <div class="flex justify-between text-xs py-2">
-                            <span class="text-gray-400">Ruta de despliegues</span>
-                            <span class="code-font text-gray-200">/home/frivera/apps/</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- USB Storage Status Card -->
-                <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <h2 class="text-lg font-bold mb-5 flex items-center gap-2">
-                        <i class="fa-solid fa-hard-drive text-blue-400"></i> Disco Principal (256GB USB)
-                    </h2>
-                    <div class="flex justify-between text-xs text-gray-400 mb-2">
-                        <span>Espacio Utilizado: <strong id="stat-disk-used-val" class="text-white">0 GB</strong></span>
-                        <span id="stat-disk-percent">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden mb-4">
-                        <div id="stat-disk-bar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
-                    </div>
-                    <div class="flex justify-between text-xs text-gray-500">
-                        <span>Límite de Disco</span>
-                        <span id="stat-disk-total-val">0 GB</span>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Columna Derecha: Consola CI/CD y Aplicaciones Desplegadas -->
-            <div class="space-y-6 lg:col-span-2">
-                
-                <!-- CI/CD Deploy App form -->
-                <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-rocket text-indigo-400"></i> Desplegar Nueva App o Base de Datos (CI/CD)
-                    </h2>
-                    <p class="text-xs text-gray-400 mb-5">
-                        Pega la URL de tu repositorio Git de GitHub o GitLab. Si tu proyecto tiene un archivo <strong class="text-indigo-400">docker-compose.yml</strong>, la Raspberry construirá la imagen y levantará el servicio en Docker automáticamente.
-                    </p>
-
-                    <form id="cicd-form" onsubmit="handleDeploy(event)" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 mb-1">Nombre de la Aplicación</label>
-                                <input type="text" id="deploy-name" placeholder="ej. mi-chatbot-telegram" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 mb-1">Ruta Destino (Opcional)</label>
-                                <input type="text" id="deploy-path" placeholder="Dejar vacío para usar ruta default (~/apps)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 mb-1">URL del Repositorio Git (HTTPS)</label>
-                            <input type="url" id="deploy-repo" placeholder="https://github.com/usuario/mi-repositorio.git" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
-                        </div>
-
-                        <div class="flex justify-end pt-2">
-                            <button type="submit" id="deploy-btn" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white font-bold text-sm rounded-xl flex items-center gap-2">
-                                <i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue
-                            </button>
-                        </div>
-                    </form>
-
-                    <!-- Terminal Deployment Logs -->
-                    <div id="logs-container" class="mt-6 hidden">
-                        <h3 class="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="fa-solid fa-terminal text-emerald-400"></i> Log del Servidor en tiempo real:
-                        </h3>
-                        <pre id="deploy-logs" class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-xs text-emerald-400 code-font overflow-x-auto max-h-60 overflow-y-auto">Iniciando pipeline...</pre>
-                    </div>
-                </div>
-
-                <!-- Docker App Status Dashboard -->
-                <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-5">
-                        <h2 class="text-lg font-bold flex items-center gap-2">
-                            <i class="fa-brands fa-docker text-sky-400 text-xl"></i> Administrador de Docker
+        <!-- SECCIÓN 1: DASHBOARD -->
+        <section id="tab-content-dashboard" class="space-y-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Columna Izquierda: Configuración Rápida & Almacenamiento -->
+                <div class="space-y-6 lg:col-span-1">
+                    <!-- Quick Settings -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                        <h2 class="text-lg font-bold mb-5 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-emerald-400"></i> Ajustes Rápidos
                         </h2>
-                        <button onclick="refreshData()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
-                            <i class="fa-solid fa-arrows-rotate"></i>
-                        </button>
+                        
+                        <!-- Toggle GUI Command -->
+                        <div class="bg-gray-950 p-4 rounded-xl border border-gray-800/80 flex flex-col gap-3">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h3 class="font-bold text-sm text-white">Interfaz Gráfica (VNC)</h3>
+                                    <p class="text-xs text-gray-400">Controla el servidor de ventanas Desktop.</p>
+                                </div>
+                                <span id="gui-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-gray-800 text-gray-400">Consultando...</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                <button onclick="controlGUI('start')" class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-all text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-play"></i> Encender
+                                </button>
+                                <button onclick="controlGUI('stop')" class="px-3 py-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/20 active:scale-95 transition-all text-red-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-power-off"></i> Apagar RAM
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Host Information -->
+                        <div class="mt-6 space-y-3">
+                            <div class="flex justify-between text-xs py-2 border-b border-gray-800">
+                                <span class="text-gray-400">Host IP</span>
+                                <span class="code-font font-semibold text-emerald-400">192.168.1.22</span>
+                            </div>
+                            <div class="flex justify-between text-xs py-2 border-b border-gray-800">
+                                <span class="text-gray-400">Sistema Base</span>
+                                <span class="font-semibold text-gray-200">Linux (ARM 64-bit)</span>
+                            </div>
+                            <div class="flex justify-between text-xs py-2">
+                                <span class="text-gray-400">Ruta de despliegues</span>
+                                <span class="code-font text-gray-200">/home/frivera/apps/</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Containers table -->
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="border-b border-gray-800 text-xs uppercase text-gray-400 tracking-wider">
-                                    <th class="py-3 px-4 font-semibold">Contenedor</th>
-                                    <th class="py-3 px-4 font-semibold">Imagen</th>
-                                    <th class="py-3 px-4 font-semibold">Estado</th>
-                                    <th class="py-3 px-4 font-semibold text-right">Controles Rápidos</th>
-                                </tr>
-                            </thead>
-                            <tbody id="docker-list" class="divide-y divide-gray-800/50 text-sm">
-                                <!-- Se rellena vía Javascript -->
-                                <tr>
-                                    <td colspan="4" class="py-8 text-center text-gray-500 text-xs">Cargando contenedores Docker activos...</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <!-- USB Storage Status Card -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                        <h2 class="text-lg font-bold mb-5 flex items-center gap-2">
+                            <i class="fa-solid fa-hard-drive text-blue-400"></i> Disco Principal (256GB USB)
+                        </h2>
+                        <div class="flex justify-between text-xs text-gray-400 mb-2">
+                            <span>Espacio Utilizado: <strong id="stat-disk-used-val" class="text-white">0 GB</strong></span>
+                            <span id="stat-disk-percent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden mb-4">
+                            <div id="stat-disk-bar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Límite de Disco</span>
+                            <span id="stat-disk-total-val">0 GB</span>
+                        </div>
                     </div>
                 </div>
 
-            </div>
+                <!-- Columna Derecha: Consola CI/CD y Aplicaciones Desplegadas -->
+                <div class="space-y-6 lg:col-span-2">
+                    <!-- CI/CD Deploy App form -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-rocket text-indigo-400"></i> Desplegar Nueva App o Base de Datos (CI/CD)
+                        </h2>
+                        <p class="text-xs text-gray-400 mb-5">
+                            Pega la URL de tu repositorio Git de GitHub o GitLab. Si tu proyecto tiene un archivo <strong class="text-indigo-400">docker-compose.yml</strong>, la Raspberry construirá la imagen y levantará el servicio en Docker automáticamente.
+                        </p>
 
-        </div>
+                        <form id="cicd-form" onsubmit="handleDeploy(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-400 mb-1">Nombre de la Aplicación</label>
+                                    <input type="text" id="deploy-name" placeholder="ej. mi-chatbot-telegram" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-400 mb-1">Ruta Destino (Opcional)</label>
+                                    <input type="text" id="deploy-path" placeholder="Dejar vacío para usar ruta default (~/apps)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-400 mb-1">URL del Repositorio Git (HTTPS)</label>
+                                <input type="url" id="deploy-repo" placeholder="https://github.com/usuario/mi-repositorio.git" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+
+                            <div class="flex justify-end pt-2">
+                                <button type="submit" id="deploy-btn" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white font-bold text-sm rounded-xl flex items-center gap-2">
+                                    <i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Terminal Deployment Logs -->
+                        <div id="logs-container" class="mt-6 hidden">
+                            <h3 class="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-terminal text-emerald-400"></i> Log del Servidor en tiempo real:
+                            </h3>
+                            <pre id="deploy-logs" class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-xs text-emerald-400 code-font overflow-x-auto max-h-60 overflow-y-auto">Iniciando pipeline...</pre>
+                        </div>
+                    </div>
+
+                    <!-- Docker App Status Dashboard -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                        <div class="flex justify-between items-center mb-5">
+                            <h2 class="text-lg font-bold flex items-center gap-2">
+                                <i class="fa-brands fa-docker text-sky-400 text-xl"></i> Administrador de Docker
+                            </h2>
+                            <button onclick="refreshData()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
+                        </div>
+
+                        <!-- Containers table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-gray-800 text-xs uppercase text-gray-400 tracking-wider">
+                                        <th class="py-3 px-4 font-semibold">Contenedor</th>
+                                        <th class="py-3 px-4 font-semibold">Imagen</th>
+                                        <th class="py-3 px-4 font-semibold">Estado</th>
+                                        <th class="py-3 px-4 font-semibold text-right">Controles Rápidos</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="docker-list" class="divide-y divide-gray-800/50 text-sm">
+                                    <tr>
+                                        <td colspan="4" class="py-8 text-center text-gray-500 text-xs">Cargando contenedores Docker activos...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 2: CÁMARAS -->
+        <section id="tab-content-cameras" class="hidden">
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-camera text-emerald-400"></i> Cámaras Conectadas
+                </h2>
+                <p class="text-xs text-gray-400 mb-6">
+                    Visualiza las transmisiones de tus cámaras USB y CSI. Las imágenes se actualizan automáticamente bajo demanda.
+                </p>
+                <div id="cameras-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="col-span-2 text-center py-8 text-gray-500 text-xs">Cargando cámaras disponibles...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 3: RED WIFI -->
+        <section id="tab-content-network" class="hidden">
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-5">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-wifi text-sky-400"></i> Dispositivos Conectados en la Red Local
+                    </h2>
+                    <button onclick="refreshNetworkClients()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-800 text-xs uppercase text-gray-400 tracking-wider">
+                                <th class="py-3 px-4 font-semibold">Dispositivo</th>
+                                <th class="py-3 px-4 font-semibold">Dirección IP</th>
+                                <th class="py-3 px-4 font-semibold">Dirección MAC</th>
+                                <th class="py-3 px-4 font-semibold">Interfaz</th>
+                            </tr>
+                        </thead>
+                        <tbody id="network-clients-list" class="divide-y divide-gray-800/50 text-sm">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center text-gray-500 text-xs">Cargando lista de red...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- Modal Notificación -->
@@ -302,6 +358,43 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <!-- Script de lógica e interacción en el Frontend -->
     <script>
+        let cameraInterval = null;
+        let activeTab = "dashboard";
+
+        function switchTab(tabId) {
+            activeTab = tabId;
+            
+            // Ocultar todos los contenidos
+            document.getElementById("tab-content-dashboard").classList.add("hidden");
+            document.getElementById("tab-content-cameras").classList.add("hidden");
+            document.getElementById("tab-content-network").classList.add("hidden");
+
+            // Mostrar el activo
+            document.getElementById(`tab-content-${tabId}`).classList.remove("hidden");
+
+            // Actualizar diseño de botones
+            const tabs = ["dashboard", "cameras", "network"];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabId) {
+                    btn.className = "px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition-all flex items-center gap-2";
+                } else {
+                    btn.className = "px-5 py-3 border-b-2 border-transparent text-gray-400 hover:text-white font-bold text-sm transition-all flex items-center gap-2";
+                }
+            });
+
+            // Disparar acciones según pestaña activa
+            if (tabId === "cameras") {
+                loadCameraList();
+            } else {
+                stopCameraStreams();
+            }
+
+            if (tabId === "network") {
+                refreshNetworkClients();
+            }
+        }
+
         // Formateadores de Bytes
         function formatBytes(bytes, decimals = 2) {
             if (!+bytes) return '0 Bytes'
@@ -512,6 +605,83 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue`;
                 refreshData();
+            }
+        }
+
+        // --- MÉTODOS DE CÁMARAS ---
+        async function loadCameraList() {
+            try {
+                const res = await fetch("/api/camera/list");
+                const cameras = await res.json();
+                const grid = document.getElementById("cameras-grid");
+                
+                if (!cameras || cameras.length === 0) {
+                    grid.innerHTML = `<div class="col-span-2 text-center py-8 text-gray-500 text-xs">No se detectaron cámaras conectadas en la Raspberry Pi.</div>`;
+                    return;
+                }
+
+                grid.innerHTML = cameras.map(cam => `
+                    <div class="bg-gray-950 border border-gray-800 rounded-xl overflow-hidden p-4 flex flex-col gap-3">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-sm text-white">${cam.name}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">${cam.type}</span>
+                        </div>
+                        <div class="bg-gray-900 border border-gray-800/50 rounded-lg aspect-video flex items-center justify-center overflow-hidden relative">
+                            <img data-camera-id="${cam.id}" class="camera-stream-img w-full h-full object-cover" src="/api/camera/frame?id=${cam.id}" alt="Stream">
+                            <div class="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[9px] text-gray-300 code-font flex items-center gap-1">
+                                <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                startCameraStreams();
+            } catch (err) {
+                console.error("Error cargando cámaras:", err);
+            }
+        }
+
+        function startCameraStreams() {
+            stopCameraStreams();
+            cameraInterval = setInterval(() => {
+                const imgs = document.querySelectorAll(".camera-stream-img");
+                imgs.forEach(img => {
+                    const camId = img.dataset.cameraId;
+                    img.src = `/api/camera/frame?id=${camId}&t=${Date.now()}`;
+                });
+            }, 600); // Frecuencia de 600ms ligera para no sobrecalentar la RPi 3 B+
+        }
+
+        function stopCameraStreams() {
+            if (cameraInterval) {
+                clearInterval(cameraInterval);
+                cameraInterval = null;
+            }
+        }
+
+        // --- MÉTODOS DE RED WIFI ---
+        async function refreshNetworkClients() {
+            const tbody = document.getElementById("network-clients-list");
+            tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-500 text-xs">Escaneando red local...</td></tr>`;
+            try {
+                const res = await fetch("/api/network/clients");
+                const clients = await res.json();
+                
+                if (!clients || clients.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-500 text-xs">No se detectaron dispositivos de red conectados.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = clients.map(client => `
+                    <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
+                        <td class="py-3.5 px-4 font-bold text-gray-200">${client.hostname}</td>
+                        <td class="py-3.5 px-4 code-font text-emerald-400">${client.ip}</td>
+                        <td class="py-3.5 px-4 code-font text-gray-400">${client.mac}</td>
+                        <td class="py-3.5 px-4 text-xs font-semibold text-gray-500 uppercase">${client.device}</td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500 text-xs">Error cargando clientes de red.</td></tr>`;
             }
         }
 

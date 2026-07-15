@@ -8,7 +8,10 @@ from src.application.ports.inputs import (
     ToggleGuiUseCase,
     ControlDockerContainerUseCase,
     GetDockerContainerLogsUseCase,
-    DeployAppUseCase
+    DeployAppUseCase,
+    GetCamerasUseCase,
+    CaptureCameraFrameUseCase,
+    GetWifiClientsUseCase
 )
 
 def create_handler_class(
@@ -16,7 +19,10 @@ def create_handler_class(
     gui_use_case: ToggleGuiUseCase,
     docker_use_case: ControlDockerContainerUseCase,
     docker_logs_use_case: GetDockerContainerLogsUseCase,
-    deploy_use_case: DeployAppUseCase
+    deploy_use_case: DeployAppUseCase,
+    get_cameras_use_case: GetCamerasUseCase,
+    capture_frame_use_case: CaptureCameraFrameUseCase,
+    get_wifi_clients_use_case: GetWifiClientsUseCase
 ):
     class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -35,7 +41,7 @@ def create_handler_class(
                 return
 
             # 1.1 API: Obtener Logs de Contenedor Docker (JSON)
-            if url_parsed.path == "/api/docker/logs":
+            elif url_parsed.path == "/api/docker/logs":
                 query_params = parse_qs(url_parsed.query)
                 container_id = query_params.get("id", [None])[0]
                 self.send_response(200)
@@ -51,8 +57,47 @@ def create_handler_class(
                 self.wfile.write(json.dumps(response_data).encode("utf-8"))
                 return
 
+            # 1.2 API: Obtener lista de cámaras
+            elif url_parsed.path == "/api/camera/list":
+                cameras = get_cameras_use_case.execute()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps([c.to_dict() for c in cameras]).encode("utf-8"))
+                return
+
+            # 1.3 API: Capturar frame de cámara (Retorna imagen directa)
+            elif url_parsed.path == "/api/camera/frame":
+                query_params = parse_qs(url_parsed.query)
+                camera_id = query_params.get("id", [None])[0]
+                
+                if camera_id:
+                    frame_bytes = capture_frame_use_case.execute(camera_id)
+                    self.send_response(200)
+                    
+                    # Detectar si es PNG o JPEG a partir de los bytes mágicos
+                    if frame_bytes.startswith(b'\x89PNG'):
+                        self.send_header("Content-Type", "image/png")
+                    else:
+                        self.send_header("Content-Type", "image/jpeg")
+                        
+                    self.end_headers()
+                    self.wfile.write(frame_bytes)
+                else:
+                    self.send_error(400, "Falta el ID de la camara")
+                return
+
+            # 1.4 API: Clientes de red conectados
+            elif url_parsed.path == "/api/network/clients":
+                clients = get_wifi_clients_use_case.execute()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps([c.to_dict() for c in clients]).encode("utf-8"))
+                return
+
             # 2. Servir la interfaz gráfica principal
-            if url_parsed.path == "/":
+            elif url_parsed.path == "/":
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
@@ -116,7 +161,10 @@ class WebServer:
         gui_use_case: ToggleGuiUseCase,
         docker_use_case: ControlDockerContainerUseCase,
         docker_logs_use_case: GetDockerContainerLogsUseCase,
-        deploy_use_case: DeployAppUseCase
+        deploy_use_case: DeployAppUseCase,
+        get_cameras_use_case: GetCamerasUseCase,
+        capture_frame_use_case: CaptureCameraFrameUseCase,
+        get_wifi_clients_use_case: GetWifiClientsUseCase
     ):
         self.port = port
         self.handler_class = create_handler_class(
@@ -124,7 +172,10 @@ class WebServer:
             gui_use_case,
             docker_use_case,
             docker_logs_use_case,
-            deploy_use_case
+            deploy_use_case,
+            get_cameras_use_case,
+            capture_frame_use_case,
+            get_wifi_clients_use_case
         )
 
     def start(self):

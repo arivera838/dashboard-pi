@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from src.domain.models import SystemMetrics, DockerContainer
+from src.domain.models import SystemMetrics, DockerContainer, CameraInfo, WifiClient
 
 class SystemMetricsRepositoryPort(ABC):
     @abstractmethod
@@ -32,4 +32,18 @@ class DockerControllerPort(ABC):
 class DeployerPort(ABC):
     @abstractmethod
     def deploy(self, repo_url: str, target_dir: str | None, app_name: str) -> tuple[bool, str]:
+        pass
+
+class CameraPort(ABC):
+    @abstractmethod
+    def list_cameras(self) -> List[CameraInfo]:
+        pass
+
+    @abstractmethod
+    def capture_frame(self, camera_id: str) -> bytes:
+        pass
+
+class NetworkPort(ABC):
+    @abstractmethod
+    def list_wifi_clients(self) -> List[WifiClient]:
         pass

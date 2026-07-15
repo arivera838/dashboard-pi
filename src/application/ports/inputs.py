@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from src.domain.models import SystemStatus, DeploymentResult
+from typing import List
+from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient
 
 class GetSystemStatusUseCase(ABC):
     @abstractmethod
@@ -24,4 +25,19 @@ class GetDockerContainerLogsUseCase(ABC):
 class DeployAppUseCase(ABC):
     @abstractmethod
     def execute(self, repo_url: str, target_dir: str | None, app_name: str) -> DeploymentResult:
+        pass
+
+class GetCamerasUseCase(ABC):
+    @abstractmethod
+    def execute(self) -> List[CameraInfo]:
+        pass
+
+class CaptureCameraFrameUseCase(ABC):
+    @abstractmethod
+    def execute(self, camera_id: str) -> bytes:
+        pass
+
+class GetWifiClientsUseCase(ABC):
+    @abstractmethod
+    def execute(self) -> List[WifiClient]:
         pass

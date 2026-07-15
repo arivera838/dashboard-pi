@@ -1,17 +1,22 @@
 from typing import List
-from src.domain.models import SystemStatus, DeploymentResult
+from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient
 from src.application.ports.inputs import (
     GetSystemStatusUseCase,
     ToggleGuiUseCase,
     ControlDockerContainerUseCase,
     GetDockerContainerLogsUseCase,
-    DeployAppUseCase
+    DeployAppUseCase,
+    GetCamerasUseCase,
+    CaptureCameraFrameUseCase,
+    GetWifiClientsUseCase
 )
 from src.application.ports.outputs import (
     SystemMetricsRepositoryPort,
     GuiControllerPort,
     DockerControllerPort,
-    DeployerPort
+    DeployerPort,
+    CameraPort,
+    NetworkPort
 )
 
 class SystemStatusService(GetSystemStatusUseCase):
@@ -60,3 +65,38 @@ class DeploymentService(DeployAppUseCase):
         success, log = self._deployer.deploy(repo_url, target_dir, app_name)
         message = "¡Despliegue completado!" if success else "Error durante el despliegue"
         return DeploymentResult(success=success, log=log, message=message)
+
+class CameraService(GetCamerasUseCase, CaptureCameraFrameUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute_list(self) -> List[CameraInfo]:
+        # Implementa GetCamerasUseCase.
+        # Python abstract classes permit different implementation method names or matching signature.
+        # We will use execute() for Use Cases or separate methods depending on design.
+        return self._camera_port.list_cameras()
+
+    # To satisfy both interfaces under a clean Execute structure:
+    # We will split it into two Use Cases to follow Single Responsibility Principle.
+    pass
+
+class GetCamerasService(GetCamerasUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self) -> List[CameraInfo]:
+        return self._camera_port.list_cameras()
+
+class CaptureCameraFrameService(CaptureCameraFrameUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self, camera_id: str) -> bytes:
+        return self._camera_port.capture_frame(camera_id)
+
+class GetWifiClientsService(GetWifiClientsUseCase):
+    def __init__(self, network_port: NetworkPort):
+        self._network_port = network_port
+
+    def execute(self) -> List[WifiClient]:
+        return self._network_port.list_wifi_clients()
