@@ -93,17 +93,18 @@ class SubprocessCameraAdapter(CameraPort):
         print(f"[Camera] Iniciando captura continua para {camera_id} (Dispositivo {device_index})")
         cap = None
         consecutive_errors = 0
+        use_gstreamer = (camera_id == "csi")
         
         while self._running.get(camera_id, False):
             if cap is None or not cap.isOpened():
                 try:
-                    if camera_id == "csi":
+                    if use_gstreamer:
                         # Intentar GStreamer libcamerasrc para cámara CSI nativa (RPi OS Bullseye/Bookworm)
                         gst_pipeline = "libcamerasrc ! video/x-raw, width=640, height=480, framerate=25/1 ! videoconvert ! appsink drop=true sync=false"
                         with self._silence_stderr():
                             cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
                         if not cap.isOpened():
-                            # Fallback si GStreamer no está disponible
+                            use_gstreamer = False
                             cap = cv2.VideoCapture(device_index)
                     else:
                         cap = cv2.VideoCapture(device_index)
@@ -113,6 +114,7 @@ class SubprocessCameraAdapter(CameraPort):
                     consecutive_errors = 0
                 except Exception as e:
                     print(f"[Camera] Error abriendo camara {camera_id}: {e}")
+                    use_gstreamer = False
                     time.sleep(2.0)
                     continue
 
@@ -141,7 +143,15 @@ class SubprocessCameraAdapter(CameraPort):
                 time.sleep(0.04) # ~25 FPS
             except Exception as e:
                 consecutive_errors += 1
-                if consecutive_errors > 10:
+                # Si GStreamer falla en extraer frames consecutivos, forzar fallback a V4L2 directo
+                if use_gstreamer and consecutive_errors >= 3:
+                    print(f"[Camera] GStreamer falló al extraer frames de {camera_id}. Cambiando a V4L2 (Dispositivo {device_index})...")
+                    use_gstreamer = False
+                    if cap:
+                        cap.release()
+                    cap = None
+                    consecutive_errors = 0
+                elif consecutive_errors > 10:
                     print(f"[Camera] Reiniciando conexión de {camera_id} debido a errores consecutivos: {e}")
                     if cap:
                         cap.release()
