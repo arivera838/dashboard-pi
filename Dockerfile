@@ -12,7 +12,6 @@ WORKDIR /app
 
 # Copiar el código fuente
 COPY main.py .
-COPY src/ ./src/
 
 # Exponer el puerto
 EXPOSE 8080
