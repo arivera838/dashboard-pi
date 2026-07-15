@@ -5,7 +5,9 @@ from typing import List, Dict
 from src.domain.models import CameraInfo, RecordingStatus
 from src.application.ports.outputs import CameraPort
 
-# Intentar importar OpenCV para captura fluida y de alto rendimiento
+# Silenciar advertencias internas de la librería de C++ de OpenCV
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+
 try:
     import cv2
     OPENCV_AVAILABLE = True
