@@ -120,9 +120,16 @@ def create_handler_class(
                 self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
                 self.end_headers()
                 
+                last_frame_idx = -1
                 try:
                     while True:
-                        frame_bytes = capture_frame_use_case.execute(camera_id)
+                        frame_bytes, frame_idx = capture_frame_use_case.execute_packet(camera_id)
+                        if frame_idx == last_frame_idx or not frame_bytes:
+                            # Espera mínima por un nuevo fotograma para liberar CPU
+                            time.sleep(0.005)
+                            continue
+                        
+                        last_frame_idx = frame_idx
                         self.wfile.write(b'--frame\r\n')
                         if frame_bytes.startswith(b'\x89PNG'):
                             self.wfile.write(b'Content-Type: image/png\r\n\r\n')
@@ -132,7 +139,7 @@ def create_handler_class(
                             self.wfile.write(b'Content-Type: image/jpeg\r\n\r\n')
                         self.wfile.write(frame_bytes)
                         self.wfile.write(b'\r\n')
-                        time.sleep(0.04) # ~25 FPS
+                        time.sleep(0.002)
                 except (BrokenPipeError, ConnectionResetError):
                     # El cliente cerró la pestaña o detuvo la reproducción
                     pass

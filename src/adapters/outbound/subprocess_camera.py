@@ -27,6 +27,7 @@ except ImportError:
 
 class SubprocessCameraAdapter(CameraPort):
     _latest_frames: Dict[str, bytes] = {}
+    _frame_counters: Dict[str, int] = {}
     _threads: Dict[str, threading.Thread] = {}
     _running: Dict[str, bool] = {}
     _caps: Dict[str, any] = {}
@@ -197,7 +198,7 @@ class SubprocessCameraAdapter(CameraPort):
             if cap is None or not cap.isOpened():
                 try:
                     if use_gstreamer:
-                        gst_pipeline = "libcamerasrc ! video/x-raw, width=640, height=480, framerate=25/1 ! videoconvert ! appsink drop=true sync=false"
+                        gst_pipeline = "libcamerasrc ! video/x-raw, width=1280, height=720, framerate=30/1 ! videoconvert ! appsink drop=true sync=false"
                         with self._silence_stderr():
                             cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
                         if not cap.isOpened():
@@ -206,8 +207,8 @@ class SubprocessCameraAdapter(CameraPort):
                     else:
                         cap = cv2.VideoCapture(device_index)
                     
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                     consecutive_errors = 0
                 except Exception as e:
                     print(f"[Camera] Error abriendo camara {camera_id}: {e}")
@@ -228,6 +229,7 @@ class SubprocessCameraAdapter(CameraPort):
                 if success:
                     with self._lock:
                         self._latest_frames[camera_id] = jpeg.tobytes()
+                        self._frame_counters[camera_id] = self._frame_counters.get(camera_id, 0) + 1
                     consecutive_errors = 0
                 else:
                     raise Exception("Fallo en la codificación JPEG")
@@ -513,6 +515,26 @@ class SubprocessCameraAdapter(CameraPort):
             return self._get_placeholder_image("Por favor instala python3-opencv\\npara activar transmision de video fluida")
 
         return self._get_placeholder_image(f"Cargando {camera_id.upper()}...")
+
+    def get_latest_frame_packet(self, camera_id: str) -> tuple[bytes, int]:
+        if "mock" in camera_id:
+            return self._get_placeholder_image(f"Camara Simulada: {camera_id.upper()}"), int(time.time() * 2)
+
+        if OPENCV_AVAILABLE:
+            if camera_id not in self._threads or not self._threads[camera_id].is_alive():
+                dev_index = self._camera_device_indices.get(camera_id, 0)
+                self._start_camera_thread(camera_id, dev_index)
+
+            with self._lock:
+                frame = self._latest_frames.get(camera_id)
+                counter = self._frame_counters.get(camera_id, 0)
+            if frame:
+                return frame, counter
+
+        if not OPENCV_AVAILABLE:
+            return self._get_placeholder_image("Por favor instala python3-opencv\\npara activar transmision de video fluida"), 0
+
+        return self._get_placeholder_image(f"Cargando {camera_id.upper()}..."), 0
 
     def start_recording(self, camera_id: str) -> tuple[bool, str]:
         # Para simuladores, solo guardar estado en memoria

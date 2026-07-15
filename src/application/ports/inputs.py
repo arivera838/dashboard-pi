@@ -37,6 +37,10 @@ class CaptureCameraFrameUseCase(ABC):
     def execute(self, camera_id: str) -> bytes:
         pass
 
+    @abstractmethod
+    def execute_packet(self, camera_id: str) -> tuple[bytes, int]:
+        pass
+
 class GetWifiClientsUseCase(ABC):
     @abstractmethod
     def execute(self) -> List[WifiClient]:

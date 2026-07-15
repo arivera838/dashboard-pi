@@ -44,6 +44,10 @@ class CameraPort(ABC):
         pass
 
     @abstractmethod
+    def get_latest_frame_packet(self, camera_id: str) -> tuple[bytes, int]:
+        pass
+
+    @abstractmethod
     def start_recording(self, camera_id: str) -> tuple[bool, str]:
         pass
 

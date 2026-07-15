@@ -87,6 +87,9 @@ class CaptureCameraFrameService(CaptureCameraFrameUseCase):
     def execute(self, camera_id: str) -> bytes:
         return self._camera_port.capture_frame(camera_id)
 
+    def execute_packet(self, camera_id: str) -> tuple[bytes, int]:
+        return self._camera_port.get_latest_frame_packet(camera_id)
+
 class GetWifiClientsService(GetWifiClientsUseCase):
     def __init__(self, network_port: NetworkPort):
         self._network_port = network_port
