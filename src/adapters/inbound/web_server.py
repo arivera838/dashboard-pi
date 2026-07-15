@@ -82,7 +82,11 @@ def create_handler_class(
                         self.send_header("Content-Type", "image/jpeg")
                         
                     self.end_headers()
-                    self.wfile.write(frame_bytes)
+                    try:
+                        self.wfile.write(frame_bytes)
+                    except (BrokenPipeError, ConnectionResetError):
+                        # La conexión fue cancelada por el cliente (navegador) al refrescar el feed
+                        pass
                 else:
                     self.send_error(400, "Falta el ID de la camara")
                 return
