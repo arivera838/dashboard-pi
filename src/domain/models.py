@@ -100,13 +100,15 @@ class WifiClient:
     mac: str
     device: str
     hostname: str
+    bandwidth: str
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "ip": self.ip,
             "mac": self.mac,
             "device": self.device,
-            "hostname": self.hostname
+            "hostname": self.hostname,
+            "bandwidth": self.bandwidth
         }
 
 @dataclass(frozen=True)

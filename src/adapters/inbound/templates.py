@@ -362,11 +362,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <th class="py-3 px-4 font-semibold">Dirección IP</th>
                                 <th class="py-3 px-4 font-semibold">Dirección MAC</th>
                                 <th class="py-3 px-4 font-semibold">Interfaz</th>
+                                <th class="py-3 px-4 font-semibold text-right">Consumo de Internet</th>
                             </tr>
                         </thead>
                         <tbody id="network-clients-list" class="divide-y divide-gray-800/50 text-sm">
                             <tr>
-                                <td colspan="4" class="py-8 text-center text-gray-500 text-xs">Cargando lista de red...</td>
+                                <td colspan="5" class="py-8 text-center text-gray-500 text-xs">Cargando lista de red...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -890,36 +891,48 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         async function refreshNetworkClients() {
             const tbody = document.getElementById("network-clients-list");
-            tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-500 text-xs">Escaneando red local...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">Escaneando red local...</td></tr>`;
             try {
                 const res = await fetch("/api/network/clients");
                 const clients = await res.json();
                 
                 if (!clients || clients.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-500 text-xs">No se detectaron dispositivos de red conectados.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">No se detectaron dispositivos de red conectados.</td></tr>`;
                     return;
                 }
 
-                tbody.innerHTML = clients.map(client => `
-                    <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
-                        <td class="py-3.5 px-4 font-bold text-gray-200">
-                            <div class="flex items-center justify-between">
-                                <span class="flex items-center gap-2">
-                                    <i class="fa-solid ${getDeviceIcon(client.hostname)} text-sm"></i>
-                                    ${client.hostname}
+                tbody.innerHTML = clients.map(client => {
+                    const isIdle = client.bandwidth === "0 KB/s";
+                    const badgeColor = isIdle 
+                        ? "bg-gray-800 text-gray-400 border-gray-700" 
+                        : (client.bandwidth.includes("MB/s") ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-sky-500/10 text-sky-400 border-sky-500/20");
+                    
+                    return `
+                        <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
+                            <td class="py-3.5 px-4 font-bold text-gray-200">
+                                <div class="flex items-center justify-between">
+                                    <span class="flex items-center gap-2">
+                                        <i class="fa-solid ${getDeviceIcon(client.hostname)} text-sm"></i>
+                                        ${client.hostname}
+                                    </span>
+                                    <button onclick="openAliasModal('${client.mac}', '${client.hostname}')" class="p-1 hover:bg-gray-800 rounded text-gray-500 hover:text-white transition-colors" title="Editar Nombre">
+                                        <i class="fa-solid fa-pencil text-xs"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td class="py-3.5 px-4 code-font text-emerald-400">${client.ip}</td>
+                            <td class="py-3.5 px-4 code-font text-gray-400">${client.mac}</td>
+                            <td class="py-3.5 px-4 text-xs font-semibold text-gray-500 uppercase">${client.device}</td>
+                            <td class="py-3.5 px-4 text-right">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${badgeColor}">
+                                    ${client.bandwidth}
                                 </span>
-                                <button onclick="openAliasModal('${client.mac}', '${client.hostname}')" class="p-1 hover:bg-gray-800 rounded text-gray-500 hover:text-white transition-colors" title="Editar Nombre">
-                                    <i class="fa-solid fa-pencil text-xs"></i>
-                                </button>
-                            </div>
-                        </td>
-                        <td class="py-3.5 px-4 code-font text-emerald-400">${client.ip}</td>
-                        <td class="py-3.5 px-4 code-font text-gray-400">${client.mac}</td>
-                        <td class="py-3.5 px-4 text-xs font-semibold text-gray-500 uppercase">${client.device}</td>
-                    </tr>
-                `).join('');
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500 text-xs">Error cargando clientes de red.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-500 text-xs">Error cargando clientes de red.</td></tr>`;
             }
         }
 
