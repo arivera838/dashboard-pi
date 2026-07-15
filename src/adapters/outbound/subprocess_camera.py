@@ -125,17 +125,45 @@ class SubprocessCameraAdapter(CameraPort):
     def _start_all_captures(self):
         devices = self._scan_hardware_cameras()
         usb_count = 0
+        csi_found = False
         
         for dev in devices:
             if dev["is_csi"]:
                 cam_id = "csi"
                 self._camera_device_indices[cam_id] = dev["index"]
                 self._start_camera_thread(cam_id, dev["index"])
+                csi_found = True
             else:
                 cam_id = f"usb{usb_count}"
                 self._camera_device_indices[cam_id] = dev["index"]
                 self._start_camera_thread(cam_id, dev["index"])
                 usb_count += 1
+
+        # Si la cámara CSI no se detectó en /dev/video* pero rpicam-hello / libcamera-hello la ven
+        if not csi_found:
+            csi_hardware_exists = False
+            try:
+                import subprocess
+                res = subprocess.run(["rpicam-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
+                if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "/base/soc/" in res.stdout or "/base/soc/" in res.stderr):
+                    csi_hardware_exists = True
+            except Exception:
+                pass
+            
+            if not csi_hardware_exists:
+                try:
+                    import subprocess
+                    res = subprocess.run(["libcamera-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
+                    if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "/base/soc/" in res.stdout or "/base/soc/" in res.stderr):
+                        csi_hardware_exists = True
+                except Exception:
+                    pass
+            
+            if csi_hardware_exists:
+                # Forzar el registro y arranque de la cámara CSI en el dispositivo index 0
+                cam_id = "csi"
+                self._camera_device_indices[cam_id] = 0
+                self._start_camera_thread(cam_id, 0)
 
     def _start_camera_thread(self, camera_id: str, device_index: int):
         with self._lock:
@@ -201,7 +229,7 @@ class SubprocessCameraAdapter(CameraPort):
                 if not ret or frame is None:
                     raise Exception("No se pudo leer el frame")
                 
-                # Procesar reconocimiento en el fotograma antes de codificar y transmitir
+                # Procesar recognition en el fotograma antes de codificar y transmitir
                 self._process_frame_vision(frame)
 
                 # Codificar en JPEG para la UI
@@ -291,6 +319,7 @@ class SubprocessCameraAdapter(CameraPort):
         devices = self._scan_hardware_cameras()
         cameras = []
         usb_count = 0
+        csi_found = False
         
         for dev in devices:
             if dev["is_csi"]:
@@ -299,6 +328,7 @@ class SubprocessCameraAdapter(CameraPort):
                     name="Cámara Nativa Raspberry Pi (CSI Flex)",
                     type="CSI"
                 ))
+                csi_found = True
             else:
                 cameras.append(CameraInfo(
                     id=f"usb{usb_count}",
@@ -306,6 +336,34 @@ class SubprocessCameraAdapter(CameraPort):
                     type="USB"
                 ))
                 usb_count += 1
+
+        # Si no se detectó por V4L2 pero libcamera-hello la ve, forzar el listado de la cámara CSI
+        if not csi_found:
+            csi_hardware_exists = False
+            try:
+                import subprocess
+                res = subprocess.run(["rpicam-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
+                if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "/base/soc/" in res.stdout):
+                    csi_hardware_exists = True
+            except Exception:
+                pass
+            
+            if not csi_hardware_exists:
+                try:
+                    import subprocess
+                    res = subprocess.run(["libcamera-hello", "--list-cameras"], capture_output=True, text=True, timeout=1.5)
+                    if "No cameras available" not in res.stderr and ("Available cameras" in res.stdout or "/base/soc/" in res.stdout):
+                        csi_hardware_exists = True
+                except Exception:
+                    pass
+            
+            if csi_hardware_exists:
+                cameras.append(CameraInfo(
+                    id="csi",
+                    name="Cámara Nativa Raspberry Pi (CSI Flex - libcamera)",
+                    type="CSI"
+                ))
+                csi_found = True
 
         if not cameras:
             cameras.append(CameraInfo(
