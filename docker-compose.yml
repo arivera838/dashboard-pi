@@ -5,22 +5,17 @@ services:
     build: .
     container_name: dashboard-pi
     restart: unless-stopped
-    ports:
-      - "8083:8083"
+    # Habilitar acceso directo a la red del host (permite escanear IPs y clientes en la red real wlan0/eth0)
+    network_mode: host
+    # Otorgar permisos privilegiados para acceder a los dispositivos físicos (/dev/video*, /dev/vchiq para cámaras)
+    privileged: true
     volumes:
       # Permitir controlar el demonio Docker del host
       - /var/run/docker.sock:/var/run/docker.sock
       # Permitir lectura de métricas reales del hardware del host Raspberry Pi
       - /proc:/proc:ro
       - /sys:/sys:ro
-      # Carpeta donde se clonarán y desplegarán las apps en el host (ajustar si es necesario)
+      # Carpeta donde se clonarán y desplegarán las apps en el host
       - ./apps:/root/apps
     environment:
       - PYTHONUNBUFFERED=1
-    networks:
-      - red-publica
-
-networks:
-  # Le indicamos a Docker que esta red ya fue creada manualmente y no debe intentar crearla de nuevo
-  red-publica:
-    external: true
