@@ -7,11 +7,12 @@ from src.application.ports.outputs import DockerControllerPort
 
 class UnixHTTPConnection(http.client.HTTPConnection):
     def __init__(self, unix_socket_path):
-        super().__init__("localhost")
+        super().__init__("localhost", timeout=2.0)
         self.unix_socket_path = unix_socket_path
 
     def connect(self):
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.settimeout(2.0)
         self.sock.connect(self.unix_socket_path)
 
 class CliDockerController(DockerControllerPort):

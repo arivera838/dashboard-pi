@@ -718,7 +718,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         
                         <!-- Transmisión de Video Fluido vía MJPEG /api/camera/stream -->
                         <div class="bg-gray-900 border border-gray-800/50 rounded-lg aspect-video flex items-center justify-center overflow-hidden relative">
-                            <img class="w-full h-full object-cover" src="/api/camera/stream?id=${cam.id}" alt="Stream">
+                            <img class="w-full h-full object-cover" src="/api/camera/stream?id=${cam.id}" alt="Stream" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\'><rect width=\'100%\' height=\'100%\' fill=\'%23111827\'/><text x=\'50%\' y=\'50%\' font-family=\'sans-serif\' font-size=\'14\' fill=\'%23ef4444\' text-anchor=\'middle\'>Conexión Perdida</text></svg>'; showToast('Cámara', 'La conexión con la cámara se ha perdido', 'error');">
                             <div class="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[9px] text-gray-300 code-font flex items-center gap-1">
                                 <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE (30 FPS)
                             </div>

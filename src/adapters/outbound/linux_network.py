@@ -118,13 +118,15 @@ class LinuxNetworkAdapter(NetworkPort):
             if not hostname:
                 hostname = hostnames.get(mac)
             
-            # Prioridad 3: Resolución inversa DNS local
             if not hostname:
+                old_timeout = socket.getdefaulttimeout()
                 try:
                     socket.setdefaulttimeout(0.2)
                     hostname = socket.gethostbyaddr(ip)[0]
                 except Exception:
                     hostname = "Dispositivo sin nombre"
+                finally:
+                    socket.setdefaulttimeout(old_timeout)
             
             # Calcular ancho de banda consumido en tiempo real
             bandwidth = self._get_simulated_bandwidth(mac, hostname)

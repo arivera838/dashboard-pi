@@ -35,9 +35,3 @@ services:
       - ./apps:/root/apps
     environment:
       - PYTHONUNBUFFERED=1
-    networks:
-      - red-publica
-
-networks:
-  red-publica:
-    external: true

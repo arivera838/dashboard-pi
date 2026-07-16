@@ -146,8 +146,8 @@ def create_handler_class(
                         self.wfile.write(frame_bytes)
                         self.wfile.write(b'\r\n')
                         time.sleep(0.002)
-                except (BrokenPipeError, ConnectionResetError):
-                    # El cliente cerró la pestaña o detuvo la reproducción
+                except Exception as e:
+                    # El cliente cerró la pestaña, detuvo la reproducción, o hubo un error de red
                     pass
                 return
 
@@ -372,8 +372,8 @@ class WebServer:
         except Exception:
             pass
 
-        socketserver.TCPServer.allow_reuse_address = True
-        with socketserver.TCPServer(("", self.port), self.handler_class) as httpd:
+        socketserver.ThreadingTCPServer.allow_reuse_address = True
+        with socketserver.ThreadingTCPServer(("", self.port), self.handler_class) as httpd:
             print(f"==========================================================")
             print(f"🚀 ¡CENTRO DE CONTROL RASPBERRY PI 3 B+ INICIADO!")
             print(f"👉 Local:   http://localhost:{self.port}")
