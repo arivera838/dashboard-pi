@@ -11,6 +11,8 @@ from src.application.ports.inputs import (
     ControlDockerContainerUseCase,
     GetDockerContainerLogsUseCase,
     DeployAppUseCase,
+    GetDeployStatusUseCase,
+    ListDeploymentsUseCase,
     GetCamerasUseCase,
     CaptureCameraFrameUseCase,
     GetWifiClientsUseCase,
@@ -29,6 +31,8 @@ def create_handler_class(
     docker_use_case: ControlDockerContainerUseCase,
     docker_logs_use_case: GetDockerContainerLogsUseCase,
     deploy_use_case: DeployAppUseCase,
+    get_deploy_status_use_case: GetDeployStatusUseCase,
+    list_deployments_use_case: ListDeploymentsUseCase,
     get_cameras_use_case: GetCamerasUseCase,
     capture_frame_use_case: CaptureCameraFrameUseCase,
     get_wifi_clients_use_case: GetWifiClientsUseCase,
@@ -201,6 +205,27 @@ def create_handler_class(
                         self.wfile.write(f.read())
                 except Exception:
                     pass
+            # 1.39 API: Obtener logs de despliegue en tiempo real
+            elif url_parsed.path == "/api/cicd/deploy/status":
+                query_params = parse_qs(url_parsed.query)
+                app_name = query_params.get("app_name", [None])[0]
+                if app_name:
+                    status = get_deploy_status_use_case.execute(app_name)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(status).encode("utf-8"))
+                else:
+                    self.send_error(400, "Falta el nombre de la app")
+                return
+
+            # 1.395 API: Listar todos los despliegues activos y pasados
+            elif url_parsed.path == "/api/cicd/deployments":
+                status = list_deployments_use_case.execute()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(status).encode("utf-8"))
                 return
 
             # 1.4 API: Clientes de red conectados
@@ -257,10 +282,9 @@ def create_handler_class(
                 repo_url = params.get("repo_url")
                 target_dir = params.get("target_dir")
                 app_name = params.get("app_name", "mi-proyecto-web")
-                app_port = params.get("app_port")
                 
                 if repo_url:
-                    res = deploy_use_case.execute(repo_url, target_dir, app_name, app_port)
+                    res = deploy_use_case.execute(repo_url, target_dir, app_name)
                     response_data = res.to_dict()
                 else:
                     response_data = {"status": "error", "message": "Falta la URL del repositorio de Git."}
@@ -314,6 +338,8 @@ class WebServer:
         docker_use_case: ControlDockerContainerUseCase,
         docker_logs_use_case: GetDockerContainerLogsUseCase,
         deploy_use_case: DeployAppUseCase,
+        get_deploy_status_use_case: GetDeployStatusUseCase,
+        list_deployments_use_case: ListDeploymentsUseCase,
         get_cameras_use_case: GetCamerasUseCase,
         capture_frame_use_case: CaptureCameraFrameUseCase,
         get_wifi_clients_use_case: GetWifiClientsUseCase,
@@ -332,6 +358,8 @@ class WebServer:
             docker_use_case,
             docker_logs_use_case,
             deploy_use_case,
+            get_deploy_status_use_case,
+            list_deployments_use_case,
             get_cameras_use_case,
             capture_frame_use_case,
             get_wifi_clients_use_case,

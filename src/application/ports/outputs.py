@@ -31,7 +31,15 @@ class DockerControllerPort(ABC):
 
 class DeployerPort(ABC):
     @abstractmethod
-    def deploy(self, repo_url: str, target_dir: str | None, app_name: str, app_port: str | None) -> tuple[bool, str]:
+    def deploy(self, repo_url: str, target_dir: str | None, app_name: str) -> tuple[bool, str]:
+        pass
+
+    @abstractmethod
+    def get_deploy_status(self, app_name: str) -> dict:
+        pass
+
+    @abstractmethod
+    def get_all_deployments(self) -> dict:
         pass
 
 class CameraPort(ABC):

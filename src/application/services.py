@@ -6,6 +6,8 @@ from src.application.ports.inputs import (
     ControlDockerContainerUseCase,
     GetDockerContainerLogsUseCase,
     DeployAppUseCase,
+    GetDeployStatusUseCase,
+    ListDeploymentsUseCase,
     GetCamerasUseCase,
     CaptureCameraFrameUseCase,
     GetWifiClientsUseCase,
@@ -68,10 +70,24 @@ class DeploymentService(DeployAppUseCase):
     def __init__(self, deployer: DeployerPort):
         self._deployer = deployer
 
-    def execute(self, repo_url: str, target_dir: str | None, app_name: str, app_port: str | None) -> DeploymentResult:
-        success, log = self._deployer.deploy(repo_url, target_dir, app_name, app_port)
-        message = "¡Despliegue completado!" if success else "Error durante el despliegue"
+    def execute(self, repo_url: str, target_dir: str | None, app_name: str) -> DeploymentResult:
+        success, log = self._deployer.deploy(repo_url, target_dir, app_name)
+        message = "¡Despliegue iniciado!" if success else "Error al iniciar el despliegue"
         return DeploymentResult(success=success, log=log, message=message)
+
+class GetDeployStatusService(GetDeployStatusUseCase):
+    def __init__(self, deployer: DeployerPort):
+        self._deployer = deployer
+
+    def execute(self, app_name: str) -> dict:
+        return self._deployer.get_deploy_status(app_name)
+
+class ListDeploymentsService(ListDeploymentsUseCase):
+    def __init__(self, deployer: DeployerPort):
+        self._deployer = deployer
+
+    def execute(self) -> dict:
+        return self._deployer.get_all_deployments()
 
 class GetCamerasService(GetCamerasUseCase):
     def __init__(self, camera_port: CameraPort):

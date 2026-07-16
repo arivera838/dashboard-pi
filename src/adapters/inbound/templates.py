@@ -30,6 +30,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body class="text-gray-100 min-height-screen">
 
+    <!-- Alerta Global de Despliegue en curso -->
+    <div id="global-deploy-alert" class="bg-indigo-600 border-b border-indigo-500 text-white px-4 py-2.5 text-center text-xs font-bold flex items-center justify-center gap-2 hidden z-40 relative">
+        <i class="fa-solid fa-spinner animate-spin"></i>
+        <span>Hay un despliegue de CI/CD ejecutándose en segundo plano para: <span id="global-deploy-app-name" class="underline"></span></span>
+        <button onclick="focusDeploymentTab()" class="ml-4 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded text-[10px] uppercase font-bold tracking-wider transition-colors">Ver Progreso</button>
+    </div>
+
     <!-- Header -->
     <header class="border-b border-emerald-500/20 bg-gray-900/80 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -208,7 +215,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </p>
 
                         <form id="cicd-form" onsubmit="handleDeploy(event)" class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Nombre de la Aplicación</label>
                                     <input type="text" id="deploy-name" placeholder="ej. mi-chatbot-telegram" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
@@ -216,10 +223,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Ruta Destino (Opcional)</label>
                                     <input type="text" id="deploy-path" placeholder="Dejar vacío para usar ruta default (~/apps)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-400 mb-1">Puerto de la App (Opcional)</label>
-                                    <input type="number" id="deploy-port" placeholder="ej. 8000" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                                 </div>
                             </div>
                             <div>
@@ -661,36 +664,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const repo_url = document.getElementById("deploy-repo").value;
             const target_dir = document.getElementById("deploy-path").value;
             const app_name = document.getElementById("deploy-name").value;
-            const app_port = document.getElementById("deploy-port").value;
-
-            // Bloquear interfaz
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Desplegando app en segundo plano...`;
-            logsContainer.classList.remove("hidden");
-            logsPre.innerText = "Iniciando pipeline de despliegue...\\n[Git] Conectando con el repositorio remoto...\\n[Docker] Preparando ambiente...";
 
             try {
                 const res = await fetch("/api/cicd/deploy", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ repo_url, target_dir, app_name, app_port })
+                    body: JSON.stringify({ repo_url, target_dir, app_name })
                 });
                 const result = await res.json();
                 
-                if (result.status === "success") {
-                    showToast("CI/CD Despliegue", "¡Tu aplicación se ha desplegado correctamente!", "success");
-                    logsPre.innerText = result.log || "Despliegue completado con éxito sin logs adicionales.";
+                if (result.status === "success" || result.status === "running") {
+                    showToast("CI/CD Despliegue", "Inicio del pipeline solicitado en segundo plano.", "success");
+                    // Disparar chequeo inmediato
+                    setTimeout(checkActiveDeployments, 100);
                 } else {
-                    showToast("Error de Despliegue", "El proceso falló en un paso intermedio.", "error");
-                    logsPre.innerText = result.log || result.message;
+                    showToast("Error de Despliegue", result.message, "error");
+                    logsContainer.classList.remove("hidden");
+                    logsPre.innerText = result.message;
                 }
             } catch (err) {
                 showToast("Error", "La petición de despliegue se interrumpió.", "error");
-                logsPre.innerText = "Error crítico de conexión durante el despliegue.";
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue`;
-                refreshData();
+                logsContainer.classList.remove("hidden");
+                logsPre.innerText = "Error crítico de conexión durante la solicitud de despliegue.";
             }
         }
 
@@ -990,9 +985,93 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }, 4000);
         }
 
+        function focusDeploymentTab() {
+            switchTab("dashboard");
+            const form = document.getElementById("cicd-form");
+            if (form) form.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        let activeDeployPolling = null;
+        let activeDeployApp = null;
+
+        async function checkActiveDeployments() {
+            try {
+                const res = await fetch("/api/cicd/deployments");
+                const deployments = await res.json();
+                
+                let runningApp = null;
+                for (const app in deployments) {
+                    if (deployments[app].status === "running") {
+                        runningApp = app;
+                        break;
+                    }
+                }
+                
+                const alertDiv = document.getElementById("global-deploy-alert");
+                const nameSpan = document.getElementById("global-deploy-app-name");
+                
+                if (runningApp) {
+                    nameSpan.innerText = runningApp;
+                    alertDiv.classList.remove("hidden");
+                    
+                    // Si detectamos que hay un deploy corriendo y no estamos sondeándolo en la UI local,
+                    // activar la sincronización automáticamente
+                    if (activeDeployApp !== runningApp) {
+                        activeDeployApp = runningApp;
+                        
+                        const logsContainer = document.getElementById("logs-container");
+                        const logsPre = document.getElementById("deploy-logs");
+                        const btn = document.getElementById("deploy-btn");
+                        
+                        logsContainer.classList.remove("hidden");
+                        btn.disabled = true;
+                        btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Desplegando app en segundo plano...`;
+                        
+                        if (activeDeployPolling) clearInterval(activeDeployPolling);
+                        
+                        activeDeployPolling = setInterval(async () => {
+                            try {
+                                const statusRes = await fetch(`/api/cicd/deploy/status?app_name=${encodeURIComponent(runningApp)}`);
+                                const statusData = await statusRes.json();
+                                
+                                logsPre.innerText = statusData.log || "Esperando logs...";
+                                logsPre.scrollTop = logsPre.scrollHeight;
+                                
+                                if (statusData.status !== "running") {
+                                    clearInterval(activeDeployPolling);
+                                    activeDeployPolling = null;
+                                    activeDeployApp = null;
+                                    alertDiv.classList.add("hidden");
+                                    btn.disabled = false;
+                                    btn.innerHTML = `<i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue`;
+                                    
+                                    if (statusData.status === "success") {
+                                        showToast("CI/CD Despliegue", "¡Tu aplicación se ha desplegado correctamente!", "success");
+                                    } else {
+                                        showToast("Error de Despliegue", "El proceso de despliegue ha fallado.", "error");
+                                    }
+                                    refreshData();
+                                }
+                            } catch (e) {
+                                console.error("Error al obtener logs de fondo:", e);
+                            }
+                        }, 1000);
+                    }
+                } else {
+                    if (!activeDeployPolling) {
+                        alertDiv.classList.add("hidden");
+                    }
+                }
+            } catch (err) {
+                console.error("Error al verificar despliegues:", err);
+            }
+        }
+
         // Polling constante cada 4 segundos
         refreshData();
+        checkActiveDeployments();
         setInterval(refreshData, 4000);
+        setInterval(checkActiveDeployments, 4000);
     </script>
 </body>
 </html>

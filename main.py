@@ -17,6 +17,8 @@ from src.application.services import (
     DockerService,
     DockerLogsService,
     DeploymentService,
+    GetDeployStatusService,
+    ListDeploymentsService,
     GetCamerasService,
     CaptureCameraFrameService,
     GetWifiClientsService,
@@ -47,6 +49,8 @@ def main():
     docker_service = DockerService(docker_controller)
     docker_logs_service = DockerLogsService(docker_controller)
     deploy_service = DeploymentService(deployer)
+    get_deploy_status_service = GetDeployStatusService(deployer)
+    list_deployments_service = ListDeploymentsService(deployer)
     get_cameras_service = GetCamerasService(camera_adapter)
     capture_frame_service = CaptureCameraFrameService(camera_adapter)
     get_wifi_clients_service = GetWifiClientsService(network_adapter)
@@ -67,6 +71,8 @@ def main():
         docker_use_case=docker_service,
         docker_logs_use_case=docker_logs_service,
         deploy_use_case=deploy_service,
+        get_deploy_status_use_case=get_deploy_status_service,
+        list_deployments_use_case=list_deployments_service,
         get_cameras_use_case=get_cameras_service,
         capture_frame_use_case=capture_frame_service,
         get_wifi_clients_use_case=get_wifi_clients_service,
