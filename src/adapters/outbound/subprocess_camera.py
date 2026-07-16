@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import threading
-import numpy as np
 from contextlib import contextmanager
 from typing import List, Dict
 from src.domain.models import CameraInfo, RecordingStatus
@@ -11,6 +10,12 @@ from src.application.ports.outputs import CameraPort
 # Silenciar advertencias internas de la librería de C++ de OpenCV y GStreamer
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 os.environ["GST_DEBUG"] = "0"
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
 
 try:
     import cv2
@@ -332,79 +337,92 @@ class SubprocessCameraAdapter(CameraPort):
                 except Exception:
                     pass
             else:
-                # Método B: Algoritmo Nativo de Alto Rendimiento (Skin-Color segmentación + Contornos + Casco Convexo)
-                # Diseñado para correr a 30 FPS en la RPi 3 sin dependencias pesadas
-                try:
-                    # 1. Convertir a espacio de color YCrCb (ideal para segmentar tonos de piel humana)
-                    ycrcb = cv2.cvtColor(frame, cv2.COLOR_BGR2YCrCb)
-                    # Rangos estándar de color de piel en YCrCb
-                    lower_skin = np.array([0, 133, 77], dtype=np.uint8)
-                    upper_skin = np.array([255, 173, 127], dtype=np.uint8)
-                    
-                    # 2. Crear máscara y suavizar para remover ruido
-                    mask = cv2.inRange(ycrcb, lower_skin, upper_skin)
-                    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-                    mask = cv2.dilate(mask, kernel, iterations=2)
-                    mask = cv2.GaussianBlur(mask, (5, 5), 100)
-                    
-                    # 3. Encontrar contornos
-                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    if contours:
-                        # Obtener el contorno más grande (que asumimos es la mano)
-                        large_contour = max(contours, key=cv2.contourArea)
+                if not NUMPY_AVAILABLE:
+                    # Si numpy no está instalado en el ambiente, omitir algoritmo nativo
+                    cv2.putText(
+                        frame, 
+                        "Instala NumPy/OpenCV para detectar gestos nativos", 
+                        (10, frame.shape[0] - 15), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.4, 
+                        (59, 130, 246), 
+                        1, 
+                        cv2.LINE_AA
+                    )
+                else:
+                    # Método B: Algoritmo Nativo de Alto Rendimiento (Skin-Color segmentación + Contornos + Casco Convexo)
+                    # Diseñado para correr a 30 FPS en la RPi 3 sin dependencias pesadas
+                    try:
+                        # 1. Convertir a espacio de color YCrCb (ideal para segmentar tonos de piel humana)
+                        ycrcb = cv2.cvtColor(frame, cv2.COLOR_BGR2YCrCb)
+                        # Rangos estándar de color de piel en YCrCb
+                        lower_skin = np.array([0, 133, 77], dtype=np.uint8)
+                        upper_skin = np.array([255, 173, 127], dtype=np.uint8)
                         
-                        # Filtrar contornos muy pequeños para evitar falsos positivos
-                        if cv2.contourArea(large_contour) > 5000:
-                            # Dibujar contorno de la mano en azul
-                            cv2.drawContours(frame, [large_contour], -1, (239, 68, 68), 2)
+                        # 2. Crear máscara y suavizar para remover ruido
+                        mask = cv2.inRange(ycrcb, lower_skin, upper_skin)
+                        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+                        mask = cv2.dilate(mask, kernel, iterations=2)
+                        mask = cv2.GaussianBlur(mask, (5, 5), 100)
+                        
+                        # 3. Encontrar contornos
+                        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        if contours:
+                            # Obtener el contorno más grande (que asumimos es la mano)
+                            large_contour = max(contours, key=cv2.contourArea)
                             
-                            # Obtener casco convexo
-                            hull = cv2.convexHull(large_contour, returnPoints=False)
-                            defects = cv2.convexityDefects(large_contour, hull)
-                            
-                            # Contar dedos extendidos analizando defectos de convexidad
-                            fingers = 0
-                            if defects is not None:
-                                for j in range(defects.shape[0]):
-                                    s, e, f, d = defects[j, 0]
-                                    start = tuple(large_contour[s][0])
-                                    end = tuple(large_contour[e][0])
-                                    far = tuple(large_contour[f][0])
+                            # Filtrar contornos muy pequeños para evitar falsos positivos
+                            if cv2.contourArea(large_contour) > 5000:
+                                # Dibujar contorno de la mano en azul
+                                cv2.drawContours(frame, [large_contour], -1, (239, 68, 68), 2)
+                                
+                                # Obtener casco convexo
+                                hull = cv2.convexHull(large_contour, returnPoints=False)
+                                defects = cv2.convexityDefects(large_contour, hull)
+                                
+                                # Contar dedos extendidos analizando defectos de convexidad
+                                fingers = 0
+                                if defects is not None:
+                                    for j in range(defects.shape[0]):
+                                        s, e, f, d = defects[j, 0]
+                                        start = tuple(large_contour[s][0])
+                                        end = tuple(large_contour[e][0])
+                                        far = tuple(large_contour[f][0])
+                                        
+                                        # Calcular longitudes de los lados del triángulo de defecto
+                                        a = np.linalg.norm(np.array(end) - np.array(start))
+                                        b = np.linalg.norm(np.array(far) - np.array(start))
+                                        c = np.linalg.norm(np.array(end) - np.array(far))
+                                        
+                                        # Aplicar teorema del coseno para encontrar el ángulo del defecto
+                                        angle = np.arccos((b**2 + c**2 - a**2) / (2 * b * c)) * 57.29
+                                        
+                                        # Si el ángulo es menor de 90 grados y la profundidad es considerable, es un espacio interdigital
+                                        if angle <= 90 and d > 12000:
+                                            fingers += 1
+                                            cv2.circle(frame, far, 4, (59, 130, 246), -1)
                                     
-                                    # Calcular longitudes de los lados del triángulo de defecto
-                                    a = np.linalg.norm(np.array(end) - np.array(start))
-                                    b = np.linalg.norm(np.array(far) - np.array(start))
-                                    c = np.linalg.norm(np.array(end) - np.array(far))
-                                    
-                                    # Aplicar teorema del coseno para encontrar el ángulo del defecto
-                                    angle = np.arccos((b**2 + c**2 - a**2) / (2 * b * c)) * 57.29
-                                    
-                                    # Si el ángulo es menor de 90 grados y la profundidad es considerable, es un espacio interdigital
-                                    if angle <= 90 and d > 12000:
+                                    # Un conteo de defectos N se asocia a N+1 dedos levantados
+                                    if fingers > 0:
                                         fingers += 1
-                                        cv2.circle(frame, far, 4, (59, 130, 246), -1)
-                                
-                                # Un conteo de defectos N se asocia a N+1 dedos levantados
-                                if fingers > 0:
-                                    fingers += 1
+                                        
+                                # Clasificar el gesto en base a los dedos detectados
+                                gesture = "MANO DETECTADA"
+                                if fingers == 0:
+                                    gesture = "PUNO (Fist)"
+                                elif fingers == 1:
+                                    gesture = "SENALANDO (Pointing)"
+                                elif fingers == 2:
+                                    gesture = "AMOR Y PAZ (Peace)"
+                                elif fingers >= 4:
+                                    gesture = "PALMA ABIERTA (Open Hand)"
                                     
-                            # Clasificar el gesto en base a los dedos detectados
-                            gesture = "MANO DETECTADA"
-                            if fingers == 0:
-                                gesture = "PUNO (Fist)"
-                            elif fingers == 1:
-                                gesture = "SENALANDO (Pointing)"
-                            elif fingers == 2:
-                                gesture = "AMOR Y PAZ (Peace)"
-                            elif fingers >= 4:
-                                gesture = "PALMA ABIERTA (Open Hand)"
-                                
-                            # Dibujar rectángulo delimitador y escribir el gesto
-                            x, y, w, h = cv2.boundingRect(large_contour)
-                            cv2.rectangle(frame, (x, y), (x + w, y + h), (59, 130, 246), 1)
-                            cv2.putText(frame, gesture, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (59, 130, 246), 2, cv2.LINE_AA)
-                except Exception as err:
-                    print(f"[Vision] Error en procesador nativo de manos: {err}")
+                                # Dibujar rectángulo delimitador y escribir el gesto
+                                x, y, w, h = cv2.boundingRect(large_contour)
+                                cv2.rectangle(frame, (x, y), (x + w, y + h), (59, 130, 246), 1)
+                                cv2.putText(frame, gesture, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (59, 130, 246), 2, cv2.LINE_AA)
+                    except Exception as err:
+                        print(f"[Vision] Error en procesador nativo de manos: {err}")
 
     def _load_face_cascade(self):
         cascade_filename = "haarcascade_frontalface_default.xml"
