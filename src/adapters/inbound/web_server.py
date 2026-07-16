@@ -234,6 +234,19 @@ def create_handler_class(
                         self.wfile.write(f.read())
                 except Exception:
                     pass
+            # 1.39 API: Obtener configuración de CI/CD
+            elif url_parsed.path == "/api/cicd/config":
+                from src.adapters.outbound.cicd_config import get_cicd_config
+                cfg = get_cicd_config()
+                masked = {
+                    "git_token": "********" if cfg.get("git_token") else "",
+                    "webhook_secret": "********" if cfg.get("webhook_secret") else "",
+                    "telegram_token": "********" if cfg.get("telegram_token") else "",
+                    "telegram_chat_id": cfg.get("telegram_chat_id", "")
+                }
+                self._send_json(masked)
+                return
+
             # 1.39 API: Obtener logs de despliegue en tiempo real
             elif url_parsed.path == "/api/cicd/deploy/status":
                 query_params = parse_qs(url_parsed.query)
@@ -310,6 +323,27 @@ def create_handler_class(
                 return
 
             response_data = {"status": "error", "message": "Acción no reconocida"}
+
+            # --- API POST: Guardar configuración de CI/CD ---
+            if url_parsed.path == "/api/cicd/config":
+                from src.adapters.outbound.cicd_config import get_cicd_config, save_cicd_config
+                current = get_cicd_config()
+                
+                git_token = params.get("git_token", "")
+                webhook_secret = params.get("webhook_secret", "")
+                telegram_token = params.get("telegram_token", "")
+                telegram_chat_id = params.get("telegram_chat_id", "")
+                
+                new_cfg = {}
+                new_cfg["git_token"] = current.get("git_token", "") if git_token == "********" else git_token
+                new_cfg["webhook_secret"] = current.get("webhook_secret", "") if webhook_secret == "********" else webhook_secret
+                new_cfg["telegram_token"] = current.get("telegram_token", "") if telegram_token == "********" else telegram_token
+                new_cfg["telegram_chat_id"] = telegram_chat_id
+                
+                success = save_cicd_config(new_cfg)
+                response_data = {"status": "success" if success else "error", "message": "Configuración guardada con éxito." if success else "Error guardando configuración."}
+                self._send_json(response_data)
+                return
 
             # 1. API POST: Alternar la Interfaz de Escritorio (Desktop)
             if url_parsed.path == "/api/gui/toggle":

@@ -8,12 +8,19 @@ class GitManagerAdapter(GitPort):
             # Ensure target directory's parent exists
             os.makedirs(os.path.dirname(target_dir), exist_ok=True)
             
+            # Inyectar token de autenticación de Git si está presente en las variables de entorno
+            git_token = os.environ.get("GIT_TOKEN")
+            actual_url = repo_url
+            if git_token and actual_url.startswith("https://"):
+                # Reemplazar https://github.com/... por https://TOKEN@github.com/...
+                actual_url = actual_url.replace("https://", f"https://{git_token}@")
+
             # Use credentials from env or config if needed (assuming public repo or ssh config is set)
             if not os.path.exists(os.path.join(target_dir, ".git")):
                 # Directorio no existe o no es un repositorio git
                 print(f"[Git] Clonando repositorio {repo_url} (rama {branch}) en {target_dir}")
                 res = subprocess.run(
-                    ["git", "clone", "-b", branch, repo_url, target_dir],
+                    ["git", "clone", "-b", branch, actual_url, target_dir],
                     capture_output=True, text=True, timeout=120
                 )
                 if res.returncode != 0:

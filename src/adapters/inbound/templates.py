@@ -447,37 +447,77 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <!-- CI/CD Tab -->
-    <section id="tab-content-cicd" class="hidden space-y-6">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
-            <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
-                <i class="fa-solid fa-rocket text-indigo-400"></i> Despliegues Activos (Ramas)
-            </h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-800/50 text-gray-400 text-[10px] uppercase tracking-wider">
-                            <th class="py-3 px-4 font-semibold rounded-tl-lg">Repositorio / App</th>
-                            <th class="py-3 px-4 font-semibold">Rama / Ambiente</th>
-                            <th class="py-3 px-4 font-semibold">Estado</th>
-                            <th class="py-3 px-4 font-semibold">Subdominio Traefik</th>
-                            <th class="py-3 px-4 font-semibold text-right rounded-tr-lg">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="cicd-deployments-list" class="text-sm">
-                        <tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">Cargando despliegues...</td></tr>
-                    </tbody>
-                </table>
+    <section id="tab-content-cicd" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Deployments & Live Console -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                    <i class="fa-solid fa-rocket text-indigo-400"></i> Despliegues Activos (Ramas)
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-800/50 text-gray-400 text-[10px] uppercase tracking-wider">
+                                <th class="py-3 px-4 font-semibold rounded-tl-lg">Repositorio / App</th>
+                                <th class="py-3 px-4 font-semibold">Rama / Ambiente</th>
+                                <th class="py-3 px-4 font-semibold">Estado</th>
+                                <th class="py-3 px-4 font-semibold">Subdominio Traefik</th>
+                                <th class="py-3 px-4 font-semibold text-right rounded-tr-lg">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cicd-deployments-list" class="text-sm">
+                            <tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">Cargando despliegues...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="bg-gray-950 border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
+                <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                    <i class="fa-solid fa-terminal text-emerald-400"></i> Consola de Build en Vivo
+                </h2>
+                <div class="bg-black border border-gray-800 rounded-lg p-4 font-mono text-xs overflow-y-auto h-64 text-gray-300" id="cicd-terminal">
+                    <div class="text-gray-500 italic">Esperando eventos de Webhook...</div>
+                </div>
             </div>
         </div>
-        
-        <div class="bg-gray-950 border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
-            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
-                <i class="fa-solid fa-terminal text-emerald-400"></i> Consola de Build en Vivo
+
+        <!-- Credentials configuration form -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl h-fit">
+            <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                <i class="fa-solid fa-key text-indigo-400"></i> Credenciales de Git & Alertas
             </h2>
-            <div class="bg-black border border-gray-800 rounded-lg p-4 font-mono text-xs overflow-y-auto h-64 text-gray-300" id="cicd-terminal">
-                <div class="text-gray-500 italic">Esperando eventos de Webhook...</div>
-            </div>
+            <form id="cicd-config-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Token de Git (Access Token)</label>
+                    <input type="password" id="cfg-git-token" placeholder="Ej: github_pat_..." class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2.5 px-3.5 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Secreto de Webhook</label>
+                    <input type="password" id="cfg-webhook-secret" placeholder="Secreto compartido para validar firmas" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2.5 px-3.5 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                </div>
+                
+                <div class="border-t border-gray-800 my-4 pt-4">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                        <i class="fa-brands fa-telegram text-sky-400"></i> Alertas Telegram
+                    </h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Bot Token</label>
+                            <input type="password" id="cfg-telegram-token" placeholder="Token del bot" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Chat ID</label>
+                            <input type="text" id="cfg-telegram-chat-id" placeholder="ID de chat" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/10">
+                    <i class="fa-solid fa-save"></i> Guardar Configuración
+                </button>
+            </form>
         </div>
     </section>
 
@@ -502,10 +542,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const tabs = ["dashboard", "cameras", "network", "cicd"];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-btn-${t}`);
-                if (t === tabId) {
-                    btn.className = "px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition-all flex items-center gap-2";
-                } else {
-                    btn.className = "px-5 py-3 border-b-2 border-transparent text-gray-400 hover:text-white font-bold text-sm transition-all flex items-center gap-2";
+                if (btn) {
+                    if (t === tabId) {
+                        btn.className = "px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition-all flex items-center gap-2";
+                    } else {
+                        btn.className = "px-5 py-3 border-b-2 border-transparent text-gray-400 hover:text-white font-bold text-sm transition-all flex items-center gap-2";
+                    }
                 }
             });
 
@@ -522,7 +564,58 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (tabId === "network") {
                 refreshNetworkClients();
             }
+
+            if (tabId === "cicd") {
+                loadCICDConfig();
+            }
         }
+
+        async function loadCICDConfig() {
+            try {
+                const res = await fetch("/api/cicd/config");
+                const data = await res.json();
+                
+                document.getElementById("cfg-git-token").value = data.git_token || "";
+                document.getElementById("cfg-webhook-secret").value = data.webhook_secret || "";
+                document.getElementById("cfg-telegram-token").value = data.telegram_token || "";
+                document.getElementById("cfg-telegram-chat-id").value = data.telegram_chat_id || "";
+            } catch (err) {
+                console.error("Error al cargar config de CI/CD:", err);
+            }
+        }
+
+        // Listener para guardar la configuración de CI/CD
+        document.getElementById("cicd-config-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const git_token = document.getElementById("cfg-git-token").value;
+            const webhook_secret = document.getElementById("cfg-webhook-secret").value;
+            const telegram_token = document.getElementById("cfg-telegram-token").value;
+            const telegram_chat_id = document.getElementById("cfg-telegram-chat-id").value;
+            
+            try {
+                const res = await fetch("/api/cicd/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        git_token,
+                        webhook_secret,
+                        telegram_token,
+                        telegram_chat_id
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.status === "success") {
+                    showToast("CI/CD Ajustes", "¡Configuración guardada correctamente!", "success");
+                    loadCICDConfig(); // Recargar para enmascarar valores
+                } else {
+                    showToast("Error", data.message || "No se pudo guardar la configuración.", "error");
+                }
+            } catch (err) {
+                showToast("Error", "Error de conexión con el servidor.", "error");
+            }
+        });
 
         // Formateadores de Bytes
         function formatBytes(bytes, decimals = 2) {

@@ -10,6 +10,7 @@ from src.adapters.outbound.docker_cli import CliDockerController
 from src.adapters.outbound.git_deployer import SubprocessDeployer
 from src.adapters.outbound.subprocess_camera import SubprocessCameraAdapter
 from src.adapters.outbound.linux_network import LinuxNetworkAdapter
+import src.adapters.outbound.cicd_config as cicd_config
 
 from src.application.services import (
     SystemStatusService,
