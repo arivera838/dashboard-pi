@@ -21,16 +21,19 @@ class LinuxSystemMetricsRepository(SystemMetricsRepositoryPort):
             "disk_percent": 0.0
         }
 
+        import os
+        prefix = "/host" if os.path.exists("/host/proc") else ""
+
         # 1. CPU Load
         try:
-            with open("/proc/loadavg", "r") as f:
+            with open(f"{prefix}/proc/loadavg", "r") as f:
                 metrics_dict["cpu_load"] = f.read().strip().split()[0]
         except Exception:
             metrics_dict["cpu_load"] = "0.00"
 
         # 2. CPU Temperature
         try:
-            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+            with open(f"{prefix}/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 metrics_dict["cpu_temp"] = round(float(f.read().strip()) / 1000.0, 1)
         except Exception:
             metrics_dict["cpu_temp"] = 0.0
@@ -38,7 +41,7 @@ class LinuxSystemMetricsRepository(SystemMetricsRepositoryPort):
         # 3. RAM & SWAP
         try:
             meminfo = {}
-            with open("/proc/meminfo", "r") as f:
+            with open(f"{prefix}/proc/meminfo", "r") as f:
                 for line in f:
                     parts = line.split()
                     if len(parts) >= 2:
@@ -67,7 +70,7 @@ class LinuxSystemMetricsRepository(SystemMetricsRepositoryPort):
 
         # 4. Storage Disk
         try:
-            total, used, free = shutil.disk_usage("/")
+            total, used, free = shutil.disk_usage(prefix if prefix else "/")
             metrics_dict["disk_total"] = total
             metrics_dict["disk_used"] = used
             metrics_dict["disk_free"] = free

@@ -10,6 +10,8 @@ services:
     # Privilegios elevados para acceso directo al hardware del host (GPU, DMA Heaps, VCHIQ)
     privileged: true
     volumes:
+      # Montar la raíz del host de forma segura (lectura) para poder leer estadísticas de disco y proc reales
+      - /:/host:ro
       # Permite administrar contenedores del host a través del socket de Docker
       - /var/run/docker.sock:/var/run/docker.sock
       # Lectura de métricas reales de hardware del host
@@ -17,10 +19,16 @@ services:
       - /sys:/sys:ro
       # Montaje del bus del sistema DBus del host para poder controlar LightDM (GUI) desde el contenedor
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
-      # Compartir todos los dispositivos hardware (video0, video1, dma_heap) para las cámaras
+      # Compartir todos los dispositivos hardware (video0, video1, dma_heap, buses USB, etc.)
       - /dev:/dev
       # Compartir udev para permitir que libcamera reconozca la inicialización del hardware de la cámara
       - /run/udev:/run/udev:ro
+      # Compartir librerías y utilidades de firmware de la GPU de la Pi (vcgencmd, drivers de video)
+      - /opt/vc:/opt/vc:ro
+      # Compartir módulos del kernel del host para soporte de drivers de dispositivos conectados
+      - /lib/modules:/lib/modules:ro
+      # Compartir configuración de arranque y overlays de hardware
+      - /boot:/boot:ro
       # COMPARTIR ARCHIVOS IPA DE CALIBRACIÓN DE LA CÁMARA (Esencial para que libcamera funcione en Docker)
       - /usr/share/libcamera:/usr/share/libcamera:ro
       # Carpeta donde se clonarán y desplegarán las apps en el host

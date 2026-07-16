@@ -1086,7 +1086,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     refreshData();
                                 }
                             } catch (e) {
-                                console.error("Error al obtener logs de fondo:", e);
+                                // Ignorar fallos de red transitorios (ej: reinicio de contenedor)
                             }
                         }, 1000);
                     }
@@ -1096,7 +1096,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     }
                 }
             } catch (err) {
-                console.error("Error al verificar despliegues:", err);
+                // Ignorar fallos de red transitorios (ej: reinicio de contenedor)
             }
         }
 
