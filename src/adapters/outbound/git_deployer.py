@@ -96,7 +96,34 @@ class SubprocessDeployer(DeployerPort):
             compose_file = os.path.join(base_path, "docker-compose.yml")
             if os.path.exists(compose_file):
                 self._active_logs[app_name]["log"] += "\n🐳 [Docker] Detectado docker-compose.yml, construyendo e iniciando contenedores en segundo plano...\n"
-                # docker compose up -d --build (el puerto se gestiona directamente en el docker-compose.yml del proyecto)
+                
+                # Generar override de Traefik dinámicamente
+                subdomain = f"{app_name}.local"
+                override_content = f"""
+services:
+  app:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.{app_name}.rule=Host(`{subdomain}`)"
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
+    name: web
+"""
+                override_path = os.path.join(base_path, "docker-compose.override.yml")
+                try:
+                    with open(override_path, "w") as f:
+                        f.write(override_content)
+                    self._active_logs[app_name]["log"] += f"📝 [Traefik] Generado docker-compose.override.yml para dominio: {subdomain}\n"
+                    # Asegurar red web
+                    subprocess.run(["docker", "network", "create", "web"], capture_output=True)
+                except Exception as e:
+                    self._active_logs[app_name]["log"] += f"⚠️ [Traefik] Error generando override: {e}\n"
+                
+                # docker compose up -d --build
                 docker_cmd = f"cd {base_path} && docker compose up -d --build"
                 
                 process = subprocess.Popen(

@@ -145,11 +145,12 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.{project_name}.rule=Host(`{subdomain}`)"
     networks:
-      - traefik-proxy
+      - web
 
 networks:
-  traefik-proxy:
+  web:
     external: true
+    name: web
 """
             override_path = os.path.join(target_dir, "docker-compose.override.yml")
             with open(override_path, "w") as f:
@@ -157,7 +158,7 @@ networks:
             self._log(job, f"Archivo override generado para el subdominio: {subdomain}")
             
             # 4. Asegurar que la red externa existe
-            subprocess.run(["docker", "network", "create", "traefik-proxy"], capture_output=True)
+            subprocess.run(["docker", "network", "create", "web"], capture_output=True)
             
             # 5. Levantar con Docker Compose
             self._log(job, "Construyendo y levantando contenedores...")

@@ -392,6 +392,42 @@ def create_handler_class(
                 app_name = params.get("app_name", "mi-proyecto-web")
                 
                 if repo_url:
+                    # Tarea: registrar webhook automáticamente en GitHub si está el token configurado
+                    try:
+                        from src.adapters.outbound.cicd_config import get_cicd_config
+                        cfg = get_cicd_config()
+                        token = cfg.get("git_token")
+                        secret = cfg.get("webhook_secret")
+                        
+                        if token:
+                            clean_url = repo_url.strip()
+                            if clean_url.endswith(".git"):
+                                clean_url = clean_url[:-4]
+                            
+                            owner, repo = None, None
+                            if "github.com/" in clean_url:
+                                parts = clean_url.split("github.com/")[-1].split("/")
+                                if len(parts) >= 2:
+                                    owner, repo = parts[0], parts[1]
+                            elif "github.com:" in clean_url:
+                                parts = clean_url.split("github.com:")[-1].split("/")
+                                if len(parts) >= 2:
+                                    owner, repo = parts[0], parts[1]
+                                    
+                            if owner and repo:
+                                host_header = self.headers.get("Host", "")
+                                if host_header:
+                                    public_url = f"http://{host_header}"
+                                    import threading
+                                    threading.Thread(
+                                        target=webhook_use_case.cicd_manager.git.create_github_webhook,
+                                        args=(owner, repo, public_url, secret, token),
+                                        daemon=True
+                                    ).start()
+                                    print(f"[CI/CD] Disparado registro automático de Webhook para {owner}/{repo} en {public_url}")
+                    except Exception as e:
+                        print(f"[CI/CD] Error intentando registrar webhook automático: {e}")
+
                     res = deploy_use_case.execute(repo_url, target_dir, app_name)
                     response_data = res.to_dict()
                 else:
