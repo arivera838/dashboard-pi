@@ -146,3 +146,45 @@ class CliDockerController(DockerControllerPort):
             return True, raw_bytes.decode("utf-8", errors="ignore")
             
         return True, "".join(cleaned)
+
+    def list_compose_projects(self) -> List[dict]:
+        status_code, data_str = self._query_api("/containers/json?all=1")
+        if status_code != 200:
+            return []
+            
+        import re
+        projects = {}
+        try:
+            raw_list = json.loads(data_str)
+            for item in raw_list:
+                labels = item.get("Labels", {})
+                project_name = labels.get("com.docker.compose.project")
+                if not project_name:
+                    continue
+                    
+                state = item.get("State", "")
+                
+                if project_name not in projects:
+                    projects[project_name] = {
+                        "name": project_name,
+                        "status": "stopped",
+                        "subdomain": "—",
+                        "containers_count": 0,
+                        "running_count": 0
+                    }
+                    
+                projects[project_name]["containers_count"] += 1
+                if state.lower() == "running":
+                    projects[project_name]["running_count"] += 1
+                    projects[project_name]["status"] = "running"
+                    
+                # Buscar reglas de Traefik para extraer el subdominio
+                for k, v in labels.items():
+                    if k.startswith("traefik.http.routers.") and k.endswith(".rule"):
+                        m = re.search(r'Host\(`([^`]+)`\)', v)
+                        if m:
+                            projects[project_name]["subdomain"] = m.group(1)
+        except Exception as e:
+            print(f"[Docker] Error parsing compose projects: {e}")
+            
+        return list(projects.values())

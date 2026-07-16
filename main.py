@@ -51,7 +51,7 @@ def main():
     docker_logs_service = DockerLogsService(docker_controller)
     deploy_service = DeploymentService(deployer)
     get_deploy_status_service = GetDeployStatusService(deployer)
-    list_deployments_service = ListDeploymentsService(deployer)
+    list_deployments_service = ListDeploymentsService(deployer, docker_controller)
     get_cameras_service = GetCamerasService(camera_adapter)
     capture_frame_service = CaptureCameraFrameService(camera_adapter)
     get_wifi_clients_service = GetWifiClientsService(network_adapter)

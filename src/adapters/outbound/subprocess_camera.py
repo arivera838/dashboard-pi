@@ -635,8 +635,8 @@ class SubprocessCameraAdapter(CameraPort):
         return RecordingStatus(
             camera_id=camera_id,
             is_recording=is_rec,
-            filepath=filepath,
-            elapsed_time=elapsed
+            file_path=filepath,
+            recording_time=elapsed
         )
 
     def list_recordings(self) -> List[str]:

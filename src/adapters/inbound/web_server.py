@@ -345,6 +345,32 @@ def create_handler_class(
                 self._send_json(response_data)
                 return
 
+            # --- API POST: Registrar Webhook de GitHub ---
+            elif url_parsed.path == "/api/cicd/github/webhook/create":
+                from src.adapters.outbound.cicd_config import get_cicd_config
+                cfg = get_cicd_config()
+                
+                owner = params.get("owner", "")
+                repo = params.get("repo", "")
+                public_url = params.get("public_url", "")
+                
+                token = cfg.get("git_token", "")
+                secret = cfg.get("webhook_secret", "")
+                
+                if not owner or not repo or not public_url:
+                    self._send_json({"status": "error", "message": "Faltan parámetros requeridos: owner, repo o public_url"}, 400)
+                    return
+                    
+                if not token:
+                    self._send_json({"status": "error", "message": "Token de Git no configurado. Configúralo en Ajustes."}, 400)
+                    return
+                    
+                success, msg = webhook_use_case.cicd_manager.git.create_github_webhook(
+                    owner, repo, public_url, secret, token
+                )
+                self._send_json({"status": "success" if success else "error", "message": msg})
+                return
+
             # 1. API POST: Alternar la Interfaz de Escritorio (Desktop)
             if url_parsed.path == "/api/gui/toggle":
                 action = params.get("action", "")

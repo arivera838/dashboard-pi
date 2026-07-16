@@ -29,6 +29,10 @@ class DockerControllerPort(ABC):
     def get_container_logs(self, container_id: str) -> tuple[bool, str]:
         pass
 
+    @abstractmethod
+    def list_compose_projects(self) -> List[dict]:
+        pass
+
 class DeployerPort(ABC):
     @abstractmethod
     def deploy(self, repo_url: str, target_dir: str | None, app_name: str) -> tuple[bool, str]:
@@ -91,6 +95,10 @@ class NetworkPort(ABC):
 class GitPort(ABC):
     @abstractmethod
     def clone_or_pull(self, repo_url: str, branch: str, target_dir: str) -> tuple[bool, str]:
+        pass
+
+    @abstractmethod
+    def create_github_webhook(self, owner: str, repo: str, public_url: str, secret: str, token: str) -> tuple[bool, str]:
         pass
 
 class NotificationPort(ABC):

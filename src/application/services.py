@@ -83,11 +83,37 @@ class GetDeployStatusService(GetDeployStatusUseCase):
         return self._deployer.get_deploy_status(app_name)
 
 class ListDeploymentsService(ListDeploymentsUseCase):
-    def __init__(self, deployer: DeployerPort):
+    def __init__(self, deployer: DeployerPort, docker_controller: DockerControllerPort):
         self._deployer = deployer
+        self._docker = docker_controller
 
     def execute(self) -> dict:
-        return self._deployer.get_all_deployments()
+        import time
+        # 1. Obtener despliegues activos en memoria (del pipeline actual)
+        deployments = dict(self._deployer.get_all_deployments())
+        
+        # 2. Escanear contenedores corriendo en Docker para reconocer proyectos compose
+        try:
+            projects = self._docker.list_compose_projects()
+            for p in projects:
+                name = p["name"]
+                if name not in deployments:
+                    deployments[name] = {
+                        "status": p["status"],
+                        "log": "Proyecto detectado de forma autónoma corriendo en Docker.",
+                        "subdomain": p["subdomain"],
+                        "start_time": time.time(),
+                        "end_time": time.time(),
+                        "elapsed_seconds": 0
+                    }
+                else:
+                    if p["status"] == "running":
+                        deployments[name]["status"] = "running"
+                    deployments[name]["subdomain"] = p["subdomain"]
+        except Exception as e:
+            print(f"[ListDeploymentsService] Error al escanear proyectos compose: {e}")
+            
+        return deployments
 
 class GetCamerasService(GetCamerasUseCase):
     def __init__(self, camera_port: CameraPort):

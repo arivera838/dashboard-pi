@@ -61,3 +61,57 @@ class GitManagerAdapter(GitPort):
             return False, "La operación de Git excedió el tiempo límite (Timeout)."
         except Exception as e:
             return False, f"Error inesperado en git_manager: {e}"
+
+    def create_github_webhook(self, owner: str, repo: str, public_url: str, secret: str, token: str) -> tuple[bool, str]:
+        import urllib.request
+        import json
+        
+        url = f"https://api.github.com/repos/{owner}/{repo}/hooks"
+        webhook_target = public_url.rstrip("/") + "/api/webhooks/github"
+        
+        payload = {
+            "name": "web",
+            "active": True,
+            "events": ["push"],
+            "config": {
+                "url": webhook_target,
+                "content_type": "json",
+                "insecure_ssl": "1"
+            }
+        }
+        if secret:
+            payload["config"]["secret"] = secret
+            
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "DashboardPi-Agent",
+                "Content-Type": "application/json"
+            },
+            method="POST"
+        )
+        
+        try:
+            with urllib.request.urlopen(req, timeout=15) as response:
+                if response.status == 201:
+                    return True, "Webhook de GitHub creado exitosamente."
+                body = response.read().decode('utf-8')
+                return False, f"Respuesta inesperada de GitHub ({response.status}): {body}"
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='ignore')
+            try:
+                err_json = json.loads(err_body)
+                errors = err_json.get("errors", [])
+                for err in errors:
+                    if err.get("message") == "Hook already exists on this repository":
+                        return True, "El webhook ya existía en este repositorio."
+                message = err_json.get("message", err_body)
+            except Exception:
+                message = err_body
+            return False, f"Error de GitHub API ({e.code}): {message}"
+        except Exception as e:
+            return False, f"Error conectando con la API de GitHub: {str(e)}"

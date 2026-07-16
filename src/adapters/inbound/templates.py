@@ -483,41 +483,69 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Credentials configuration form -->
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl h-fit">
-            <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
-                <i class="fa-solid fa-key text-indigo-400"></i> Credenciales de Git & Alertas
-            </h2>
-            <form id="cicd-config-form" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Token de Git (Access Token)</label>
-                    <input type="password" id="cfg-git-token" placeholder="Ej: github_pat_..." class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2.5 px-3.5 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Secreto de Webhook</label>
-                    <input type="password" id="cfg-webhook-secret" placeholder="Secreto compartido para validar firmas" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2.5 px-3.5 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
-                </div>
-                
-                <div class="border-t border-gray-800 my-4 pt-4">
-                    <h3 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-                        <i class="fa-brands fa-telegram text-sky-400"></i> Alertas Telegram
-                    </h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Bot Token</label>
-                            <input type="password" id="cfg-telegram-token" placeholder="Token del bot" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Chat ID</label>
-                            <input type="text" id="cfg-telegram-chat-id" placeholder="ID de chat" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+        <!-- Columna de Configuración (1/3 de ancho en pantallas grandes) -->
+        <div class="space-y-6">
+            <!-- Autocreador de Webhooks -->
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                    <i class="fa-brands fa-github text-emerald-400 text-2xl"></i> Autocreador de Webhooks
+                </h2>
+                <p class="text-xs text-gray-400 mb-4">Registra automáticamente el webhook de push en tu repositorio de GitHub usando tu Token guardado.</p>
+                <form id="cicd-webhook-form" class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Dueño / Organización</label>
+                        <input type="text" id="webhook-owner" placeholder="Ej: afrivera" required class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Nombre del Repositorio</label>
+                        <input type="text" id="webhook-repo" placeholder="Ej: Rivera-cv" required class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">URL Pública / IP de tu Raspberry</label>
+                        <input type="text" id="webhook-public-url" placeholder="Ej: http://tu-ip-o-dominio:8083" required class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <button type="submit" id="btn-create-webhook" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-emerald-500/10">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Crear Webhook en GitHub
+                    </button>
+                </form>
+            </div>
+
+            <!-- Credentials configuration form -->
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                    <i class="fa-solid fa-key text-indigo-400"></i> Credenciales de Git & Alertas
+                </h2>
+                <form id="cicd-config-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Token de Git (Access Token)</label>
+                        <input type="password" id="cfg-git-token" placeholder="Ej: github_pat_..." class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2.5 px-3.5 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Secreto de Webhook</label>
+                        <input type="password" id="cfg-webhook-secret" placeholder="Secreto compartido para validar firmas" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2.5 px-3.5 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    
+                    <div class="border-t border-gray-800 my-4 pt-4">
+                        <h3 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                            <i class="fa-brands fa-telegram text-sky-400"></i> Alertas Telegram
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Bot Token</label>
+                                <input type="password" id="cfg-telegram-token" placeholder="Token del bot" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Chat ID</label>
+                                <input type="text" id="cfg-telegram-chat-id" placeholder="ID de chat" class="w-full bg-gray-950 border border-gray-800 text-white rounded-xl py-2 px-3 text-xs placeholder-gray-700 focus:outline-none focus:border-indigo-500">
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/10">
-                    <i class="fa-solid fa-save"></i> Guardar Configuración
-                </button>
-            </form>
+                    
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/10">
+                        <i class="fa-solid fa-save"></i> Guardar Configuración
+                    </button>
+                </form>
+            </div>
         </div>
     </section>
 
@@ -567,6 +595,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             if (tabId === "cicd") {
                 loadCICDConfig();
+                loadDeploymentsList();
             }
         }
 
@@ -581,6 +610,62 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 document.getElementById("cfg-telegram-chat-id").value = data.telegram_chat_id || "";
             } catch (err) {
                 console.error("Error al cargar config de CI/CD:", err);
+            }
+        }
+
+        async function loadDeploymentsList() {
+            try {
+                const res = await fetch("/api/cicd/deployments");
+                const deployments = await res.json();
+                const tbody = document.getElementById("cicd-deployments-list");
+                
+                if (!deployments || Object.keys(deployments).length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">No hay proyectos de despliegues o ramas activas en Docker.</td></tr>`;
+                    return;
+                }
+                
+                tbody.innerHTML = Object.entries(deployments).map(([name, app]) => {
+                    let repo = name;
+                    let env = "producción (main)";
+                    
+                    const branches = ["-dev", "-stage", "-main"];
+                    for (const b of branches) {
+                        if (name.endsWith(b)) {
+                            repo = name.slice(0, -b.length);
+                            env = b.slice(1);
+                            break;
+                        }
+                    }
+                    
+                    const statusClass = app.status === "running" || app.status === "success" 
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                        : (app.status === "queued" ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20');
+                        
+                    const statusLabel = app.status === "running" || app.status === "success" ? "Activo" : (app.status === "queued" ? "En Cola" : "Error");
+                    const subdomainLink = app.subdomain && app.subdomain !== "—" 
+                        ? `<a href="http://${app.subdomain}" target="_blank" class="text-indigo-400 hover:text-indigo-300 underline font-semibold">${app.subdomain}</a>` 
+                        : "—";
+                        
+                    return `
+                        <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
+                            <td class="py-3.5 px-4 font-bold text-gray-200">${repo}</td>
+                            <td class="py-3.5 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">${env}</td>
+                            <td class="py-3.5 px-4">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${statusClass}">
+                                    ${statusLabel}
+                                </span>
+                            </td>
+                            <td class="py-3.5 px-4 text-xs code-font">${subdomainLink}</td>
+                            <td class="py-3.5 px-4 text-right">
+                                <button onclick="showDockerLogs('${name}', '${name}')" class="p-1.5 bg-gray-800 hover:bg-sky-500/15 text-gray-400 hover:text-sky-400 rounded-lg text-xs transition-colors" title="Ver Logs">
+                                    <i class="fa-solid fa-file-lines"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error("Error al cargar la lista de despliegues:", err);
             }
         }
 
@@ -614,6 +699,38 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             } catch (err) {
                 showToast("Error", "Error de conexión con el servidor.", "error");
+            }
+        });
+
+        // Listener para registrar webhook en GitHub automáticamente
+        document.getElementById("cicd-webhook-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById("btn-create-webhook");
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Creando Webhook...`;
+            
+            const owner = document.getElementById("webhook-owner").value;
+            const repo = document.getElementById("webhook-repo").value;
+            const public_url = document.getElementById("webhook-public-url").value;
+            
+            try {
+                const res = await fetch("/api/cicd/github/webhook/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ owner, repo, public_url })
+                });
+                const data = await res.json();
+                
+                if (data.status === "success") {
+                    showToast("GitHub Webhook", data.message, "success");
+                } else {
+                    showToast("Error Webhook", data.message || "No se pudo crear el webhook.", "error");
+                }
+            } catch (err) {
+                showToast("Error", "Error de conexión con el servidor.", "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Crear Webhook en GitHub`;
             }
         });
 
@@ -1231,6 +1348,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (!activeDeployPolling) {
                         alertDiv.classList.add("hidden");
                     }
+                }
+                
+                if (activeTab === "cicd") {
+                    loadDeploymentsList();
                 }
             } catch (err) {
                 // Ignorar fallos de red transitorios (ej: reinicio de contenedor)
