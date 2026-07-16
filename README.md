@@ -45,26 +45,26 @@ Esta opción aísla la aplicación y monta de forma segura los recursos del host
    ```
 
 4. **Acceder**:
-   Abre un navegador en la misma red local e ingresa a: `http://<IP-DE-TU-RASPBERRY>:8080` (ej: `http://192.168.1.22:8080`).
+   Abre un navegador en la misma red local e ingresa a: `http://<IP-DE-TU-RASPBERRY>:8083` (ej: `http://192.168.1.22:8083`).
 
 ---
 
-### Opción 2: Sin Docker (Ejecución Directa en Python)
+### Opción 2: Sin Docker (Ejecución Directa en Python) [RECOMENDADA para Cámara CSI/USB]
 
-Esta aplicación no tiene dependencias externas de librerías de Python (usa la librería estándar para mantener el consumo de recursos al mínimo).
+Esta es la opción recomendada si vas a utilizar el flujo de video en tiempo real de la cámara y reconocimiento de gestos, ya que Docker restringe el acceso directo a los controladores de la GPU y asignación de memoria DMA Heap de la Pi.
 
 1. **Clonar el proyecto** y ubicarse en la carpeta:
    ```bash
    cd dashboardPi
    ```
 
-2. **Ejecutar el script principal**:
+2. **Ejecutar el script principal** (anteponiendo `libcamerify` y `sudo` para soporte de cámara CSI/USB y escaneo ARP):
    ```bash
-   python3 main.py
+   libcamerify sudo python3 main.py
    ```
 
 3. **Acceder**:
-   Abre en tu navegador `http://localhost:8080` o `http://<IP-DE-TU-RASPBERRY>:8080`.
+   Abre en tu navegador `http://localhost:8083` o `http://<IP-DE-TU-RASPBERRY>:8083`.
 
 > **Nota**: Para interactuar con Docker y `lightdm` (GUI) sin Docker, asegúrate de que el usuario que ejecuta el script tenga permisos adecuados de sudoer o pertenezca al grupo `docker`.
 

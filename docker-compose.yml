@@ -5,16 +5,24 @@ services:
     build: .
     container_name: dashboard-pi
     restart: unless-stopped
-    # Habilitar acceso directo a la red del host (permite escanear IPs y clientes en la red real wlan0/eth0)
+    # Compartir red con el host para permitir escaneo ARP y Ping Sweep de los clientes locales reales
     network_mode: host
-    # Otorgar permisos privilegiados para acceder a los dispositivos físicos (/dev/video*, /dev/vchiq para cámaras)
+    # Privilegios elevados para acceso directo al hardware del host (GPU, DMA Heaps, VCHIQ)
     privileged: true
     volumes:
-      # Permitir controlar el demonio Docker del host
+      # Permite administrar contenedores del host a través del socket de Docker
       - /var/run/docker.sock:/var/run/docker.sock
-      # Permitir lectura de métricas reales del hardware del host Raspberry Pi
+      # Lectura de métricas reales de hardware del host
       - /proc:/proc:ro
       - /sys:/sys:ro
+      # Montaje del bus del sistema DBus del host para poder controlar LightDM (GUI) desde el contenedor
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      # Compartir todos los dispositivos hardware (video0, video1, dma_heap) para las cámaras
+      - /dev:/dev
+      # Compartir udev para permitir que libcamera reconozca la inicialización del hardware de la cámara
+      - /run/udev:/run/udev:ro
+      # COMPARTIR ARCHIVOS IPA DE CALIBRACIÓN DE LA CÁMARA (Esencial para que libcamera funcione en Docker)
+      - /usr/share/libcamera:/usr/share/libcamera:ro
       # Carpeta donde se clonarán y desplegarán las apps en el host
       - ./apps:/root/apps
     environment:
