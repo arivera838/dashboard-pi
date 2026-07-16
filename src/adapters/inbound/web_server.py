@@ -37,6 +37,7 @@ def create_handler_class(
     deploy_use_case: DeployAppUseCase,
     get_deploy_status_use_case: GetDeployStatusUseCase,
     list_deployments_use_case: ListDeploymentsUseCase,
+    cancel_deploy_use_case: CancelDeploymentUseCase,
     get_cameras_use_case: GetCamerasUseCase,
     capture_frame_use_case: CaptureCameraFrameUseCase,
     get_wifi_clients_use_case: GetWifiClientsUseCase,
@@ -428,10 +429,19 @@ def create_handler_class(
                     except Exception as e:
                         print(f"[CI/CD] Error intentando registrar webhook automático: {e}")
 
-                    res = deploy_use_case.execute(repo_url, target_dir, app_name)
+                    res = deploy_use_case.execute(repo_url, target_dir, app_name, branch=params.get("branch", "main"))
                     response_data = res.to_dict()
                 else:
                     response_data = {"status": "error", "message": "Falta la URL del repositorio de Git."}
+
+            # 3.5 API POST: CI/CD Cancelar Despliegue Activo
+            elif url_parsed.path == "/api/cicd/deploy/cancel":
+                app_name = params.get("app_name")
+                if app_name:
+                    success, msg = cancel_deploy_use_case.execute(app_name)
+                    response_data = {"status": "success" if success else "error", "message": msg}
+                else:
+                    response_data = {"status": "error", "message": "Falta el nombre de la app a cancelar."}
 
             # 4. API POST: Iniciar grabación de cámara
             elif url_parsed.path == "/api/camera/record/start":
@@ -484,6 +494,7 @@ class WebServer:
         deploy_use_case: DeployAppUseCase,
         get_deploy_status_use_case: GetDeployStatusUseCase,
         list_deployments_use_case: ListDeploymentsUseCase,
+        cancel_deploy_use_case: CancelDeploymentUseCase,
         get_cameras_use_case: GetCamerasUseCase,
         capture_frame_use_case: CaptureCameraFrameUseCase,
         get_wifi_clients_use_case: GetWifiClientsUseCase,
@@ -505,6 +516,7 @@ class WebServer:
             deploy_use_case,
             get_deploy_status_use_case,
             list_deployments_use_case,
+            cancel_deploy_use_case,
             get_cameras_use_case,
             capture_frame_use_case,
             get_wifi_clients_use_case,

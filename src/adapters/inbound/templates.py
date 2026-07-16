@@ -218,14 +218,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </p>
 
                         <form id="cicd-form" onsubmit="handleDeploy(event)" class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Nombre de la Aplicación</label>
                                     <input type="text" id="deploy-name" placeholder="ej. mi-chatbot-telegram" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                                 </div>
                                 <div>
+                                    <label class="block text-xs font-semibold text-gray-400 mb-1">Rama (Git Branch)</label>
+                                    <input type="text" id="deploy-branch" placeholder="ej. main, dev, stage" value="main" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                </div>
+                                <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Ruta Destino (Opcional)</label>
-                                    <input type="text" id="deploy-path" placeholder="Dejar vacío para usar ruta default (~/apps)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                    <input type="text" id="deploy-path" placeholder="Dejar vacío para usar default (~/apps)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                                 </div>
                             </div>
                             <div>
@@ -233,7 +237,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <input type="url" id="deploy-repo" placeholder="https://github.com/usuario/mi-repositorio.git" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                             </div>
 
-                            <div class="flex justify-end pt-2">
+                            <div class="flex justify-end gap-3 pt-2">
+                                <button type="button" id="btn-cancel-deploy" onclick="cancelActiveDeploy()" class="hidden px-5 py-3 bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white font-bold text-sm rounded-xl flex items-center gap-2">
+                                    <i class="fa-solid fa-ban"></i> Cancelar Despliegue
+                                </button>
                                 <button type="submit" id="deploy-btn" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white font-bold text-sm rounded-xl flex items-center gap-2">
                                     <i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue
                                 </button>
@@ -918,12 +925,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const repo_url = document.getElementById("deploy-repo").value;
             const target_dir = document.getElementById("deploy-path").value;
             const app_name = document.getElementById("deploy-name").value;
+            const branch = document.getElementById("deploy-branch").value;
 
             try {
                 const res = await fetch("/api/cicd/deploy", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ repo_url, target_dir, app_name })
+                    body: JSON.stringify({ repo_url, target_dir, app_name, branch })
                 });
                 const result = await res.json();
                 

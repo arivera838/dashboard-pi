@@ -24,7 +24,12 @@ class GetDockerContainerLogsUseCase(ABC):
 
 class DeployAppUseCase(ABC):
     @abstractmethod
-    def execute(self, repo_url: str, target_dir: str | None, app_name: str) -> DeploymentResult:
+    def execute(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main") -> DeploymentResult:
+        pass
+
+class CancelDeploymentUseCase(ABC):
+    @abstractmethod
+    def execute(self, app_name: str) -> tuple[bool, str]:
         pass
 
 class GetDeployStatusUseCase(ABC):

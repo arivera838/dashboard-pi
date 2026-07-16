@@ -29,7 +29,8 @@ from src.application.services import (
     ListRecordingsService,
     GetVisionSettingsService,
     UpdateVisionSettingsService,
-    SaveClientAliasService
+    SaveClientAliasService,
+    CancelDeploymentService
 )
 from src.adapters.inbound.web_server import WebServer
 
@@ -74,6 +75,8 @@ def main():
     cicd_manager = CICDManager(git_manager, notification_manager)
     webhook_use_case = HandleWebhookUseCase(cicd_manager)
 
+    cancel_deploy_service = CancelDeploymentService(deployer)
+
     # 3. Instanciar y arrancar adaptador de entrada (servidor web) inyectando los casos de uso
     server = WebServer(
         port=PORT,
@@ -84,6 +87,7 @@ def main():
         deploy_use_case=deploy_service,
         get_deploy_status_use_case=get_deploy_status_service,
         list_deployments_use_case=list_deployments_service,
+        cancel_deploy_use_case=cancel_deploy_service,
         get_cameras_use_case=get_cameras_service,
         capture_frame_use_case=capture_frame_service,
         get_wifi_clients_use_case=get_wifi_clients_service,

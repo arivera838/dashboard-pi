@@ -8,8 +8,10 @@ from src.application.ports.outputs import DeployerPort
 class SubprocessDeployer(DeployerPort):
     # Diccionario en memoria para almacenar logs en tiempo real por app_name
     _active_logs: Dict[str, Dict] = {}
+    # Diccionario de procesos activos de Git/Docker para cancelación
+    _active_processes: Dict[str, subprocess.Popen] = {}
 
-    def deploy(self, repo_url: str, target_dir: str | None, app_name: str) -> tuple[bool, str]:
+    def deploy(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main") -> tuple[bool, str]:
         # Si ya hay un proceso en ejecución para este app_name, no iniciar otro
         if app_name in self._active_logs and self._active_logs[app_name]["status"] == "running":
             return False, "Ya hay un despliegue en curso para esta aplicación."
@@ -17,7 +19,7 @@ class SubprocessDeployer(DeployerPort):
         # Iniciar hilo de despliegue
         t = threading.Thread(
             target=self._run_deploy_thread,
-            args=(repo_url, target_dir, app_name),
+            args=(repo_url, target_dir, app_name, branch),
             daemon=True
         )
         t.start()
@@ -44,7 +46,23 @@ class SubprocessDeployer(DeployerPort):
             copy_logs[app] = app_data
         return copy_logs
 
-    def _run_deploy_thread(self, repo_url: str, target_dir: str | None, app_name: str):
+    def cancel_deploy(self, app_name: str) -> tuple[bool, str]:
+        process = self._active_processes.get(app_name)
+        if process:
+            try:
+                process.terminate()
+                process.kill()
+                self._active_processes.pop(app_name, None)
+                if app_name in self._active_logs:
+                    self._active_logs[app_name]["status"] = "error"
+                    self._active_logs[app_name]["log"] += "\n❌ [CI/CD] Despliegue cancelado por el usuario.\n"
+                    self._active_logs[app_name]["end_time"] = time.time()
+                return True, "Despliegue cancelado con éxito."
+            except Exception as e:
+                return False, f"Error al cancelar: {e}"
+        return False, "No hay ningún despliegue activo para esta aplicación."
+
+    def _run_deploy_thread(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main"):
         self._active_logs[app_name] = {
             "status": "running",
             "log": "🚀 [CI/CD] Iniciando pipeline de despliegue...\n",
@@ -67,11 +85,11 @@ class SubprocessDeployer(DeployerPort):
 
             # 2. Clonar o realizar Pull
             if not os.path.exists(base_path):
-                self._active_logs[app_name]["log"] += f"📂 [Git] Clonando repositorio en {base_path}...\n"
-                cmd = f"git clone {repo_url} {base_path}"
+                self._active_logs[app_name]["log"] += f"📂 [Git] Clonando repositorio (rama {branch}) en {base_path}...\n"
+                cmd = f"git clone -b {branch} {repo_url} {base_path}"
             else:
-                self._active_logs[app_name]["log"] += f"📂 [Git] Proyecto existente encontrado. Limpiando y haciendo git pull...\n"
-                cmd = f"cd {base_path} && git reset --hard && git pull"
+                self._active_logs[app_name]["log"] += f"📂 [Git] Proyecto existente en {base_path}. Haciendo checkout a {branch} y pull...\n"
+                cmd = f"cd {base_path} && git reset --hard && git fetch origin && git checkout {branch} && git pull origin {branch}"
 
             # Ejecución asíncrona de Git capturando la salida en vivo
             process = subprocess.Popen(
@@ -81,15 +99,17 @@ class SubprocessDeployer(DeployerPort):
                 stderr=subprocess.STDOUT,
                 text=True
             )
+            self._active_processes[app_name] = process
             
             # Leer en vivo stdout/stderr
             for line in process.stdout:
                 self._active_logs[app_name]["log"] += line
             process.wait()
+            self._active_processes.pop(app_name, None)
 
             if process.returncode != 0:
                 self._active_logs[app_name]["status"] = "error"
-                self._active_logs[app_name]["log"] += "\n❌ [ERROR] Falló el paso de Git. Despliegue abortado.\n"
+                self._active_logs[app_name]["log"] += "\n❌ [ERROR] Falló el paso de Git o Checkout de rama. Despliegue abortado.\n"
                 return
 
             # 3. Detectar docker-compose y desplegar
@@ -98,13 +118,15 @@ class SubprocessDeployer(DeployerPort):
                 self._active_logs[app_name]["log"] += "\n🐳 [Docker] Detectado docker-compose.yml, construyendo e iniciando contenedores en segundo plano...\n"
                 
                 # Generar override de Traefik dinámicamente
-                subdomain = f"{app_name}.local"
+                subdomain = f"{app_name}.local" if branch == "main" else f"{branch}.{app_name}.local"
+                project_name = f"{app_name}-{branch}"
+                
                 override_content = f"""
 services:
   app:
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.{app_name}.rule=Host(`{subdomain}`)"
+      - "traefik.http.routers.{project_name}.rule=Host(`{subdomain}`)"
     networks:
       - web
 
@@ -123,8 +145,8 @@ networks:
                 except Exception as e:
                     self._active_logs[app_name]["log"] += f"⚠️ [Traefik] Error generando override: {e}\n"
                 
-                # docker compose up -d --build
-                docker_cmd = f"cd {base_path} && docker compose up -d --build"
+                # docker compose -p {project_name} up -d --build
+                docker_cmd = f"cd {base_path} && docker compose -p {project_name} up -d --build"
                 
                 process = subprocess.Popen(
                     docker_cmd,
@@ -133,10 +155,12 @@ networks:
                     stderr=subprocess.STDOUT,
                     text=True
                 )
+                self._active_processes[app_name] = process
                 
                 for line in process.stdout:
                     self._active_logs[app_name]["log"] += line
                 process.wait()
+                self._active_processes.pop(app_name, None)
 
                 if process.returncode != 0:
                     self._active_logs[app_name]["status"] = "error"

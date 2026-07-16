@@ -70,10 +70,17 @@ class DeploymentService(DeployAppUseCase):
     def __init__(self, deployer: DeployerPort):
         self._deployer = deployer
 
-    def execute(self, repo_url: str, target_dir: str | None, app_name: str) -> DeploymentResult:
-        success, log = self._deployer.deploy(repo_url, target_dir, app_name)
+    def execute(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main") -> DeploymentResult:
+        success, log = self._deployer.deploy(repo_url, target_dir, app_name, branch)
         message = "¡Despliegue iniciado!" if success else "Error al iniciar el despliegue"
         return DeploymentResult(success=success, log=log, message=message)
+
+class CancelDeploymentService(CancelDeploymentUseCase):
+    def __init__(self, deployer: DeployerPort):
+        self._deployer = deployer
+
+    def execute(self, app_name: str) -> tuple[bool, str]:
+        return self._deployer.cancel_deploy(app_name)
 
 class GetDeployStatusService(GetDeployStatusUseCase):
     def __init__(self, deployer: DeployerPort):
