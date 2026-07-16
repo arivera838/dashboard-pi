@@ -3,8 +3,12 @@ import json
 import socketserver
 import time
 import os
+import uuid
 from urllib.parse import urlparse, parse_qs
-from src.adapters.inbound.templates import HTML_TEMPLATE
+from src.adapters.inbound.templates import HTML_TEMPLATE, LOGIN_HTML
+from src.adapters.outbound.auth_pam import authenticate_pam
+
+SESSION_TOKEN = str(uuid.uuid4())
 from src.application.ports.inputs import (
     GetSystemStatusUseCase,
     ToggleGuiUseCase,
@@ -42,7 +46,8 @@ def create_handler_class(
     list_recordings_use_case: ListRecordingsUseCase,
     get_vision_settings_use_case: GetVisionSettingsUseCase,
     update_vision_settings_use_case: UpdateVisionSettingsUseCase,
-    save_client_alias_use_case: SaveClientAliasUseCase
+    save_client_alias_use_case: SaveClientAliasUseCase,
+    webhook_use_case=None
 ):
     class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -59,8 +64,30 @@ def create_handler_class(
             except Exception:
                 pass
 
+        def is_authenticated(self):
+            if self.path.startswith("/api/webhooks/"):
+                return True
+            cookie_header = self.headers.get("Cookie", "")
+            cookies = {}
+            for cookie in cookie_header.split(";"):
+                parts = cookie.strip().split("=")
+                if len(parts) == 2:
+                    cookies[parts[0]] = parts[1]
+            return cookies.get("session_token") == SESSION_TOKEN
+
         def do_GET(self):
             url_parsed = urlparse(self.path)
+            
+            if not self.is_authenticated():
+                if url_parsed.path == "/":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(LOGIN_HTML.encode("utf-8"))
+                    return
+                else:
+                    self._send_json({"status": "error", "message": "No autorizado (Inicia sesión)"}, 401)
+                    return
             
             # 1. API: Obtener Métricas de Sistema (JSON)
             if url_parsed.path == "/api/status":
@@ -243,12 +270,44 @@ def create_handler_class(
         def do_POST(self):
             url_parsed = urlparse(self.path)
             content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
+            post_data_bytes = self.rfile.read(content_length)
+            post_data = post_data_bytes.decode('utf-8', errors='ignore')
             
+            # --- NUEVA API: Webhooks de CI/CD (GitHub / GitLab) ---
+            if url_parsed.path.startswith("/api/webhooks/"):
+                provider = url_parsed.path.split("/")[-1]
+                # Inyectar el handler de webhook usando los headers reales y los raw bytes
+                from src.application.use_cases.cicd_use_cases import HandleWebhookUseCase
+                success, msg = webhook_use_case.execute(provider, dict(self.headers), post_data_bytes)
+                self.send_response(200 if success else 400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success" if success else "error", "message": msg}).encode("utf-8"))
+                return
+                
             try:
                 params = json.loads(post_data)
             except Exception:
                 params = {}
+
+            # --- API POST: Login ---
+            if url_parsed.path == "/api/login":
+                username = params.get("username", "")
+                password = params.get("password", "")
+                if authenticate_pam(username, password):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Set-Cookie", f"session_token={SESSION_TOKEN}; Path=/; HttpOnly")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "success", "message": "Autenticación exitosa"}).encode("utf-8"))
+                else:
+                    self._send_json({"status": "error", "message": "Usuario o contraseña inválidos"}, 401)
+                return
+
+            # Si no está autenticado, denegar acceso a otras acciones POST
+            if not self.is_authenticated():
+                self._send_json({"status": "error", "message": "No autorizado (Inicia sesión)"}, 401)
+                return
 
             response_data = {"status": "error", "message": "Acción no reconocida"}
 
@@ -338,7 +397,8 @@ class WebServer:
         list_recordings_use_case: ListRecordingsUseCase,
         get_vision_settings_use_case: GetVisionSettingsUseCase,
         update_vision_settings_use_case: UpdateVisionSettingsUseCase,
-        save_client_alias_use_case: SaveClientAliasUseCase
+        save_client_alias_use_case: SaveClientAliasUseCase,
+        webhook_use_case=None
     ):
         self.port = port
         self.handler_class = create_handler_class(
@@ -358,7 +418,8 @@ class WebServer:
             list_recordings_use_case,
             get_vision_settings_use_case,
             update_vision_settings_use_case,
-            save_client_alias_use_case
+            save_client_alias_use_case,
+            webhook_use_case
         )
 
     def start(self):

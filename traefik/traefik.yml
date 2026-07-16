@@ -1,0 +1,24 @@
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+  # websecure:
+  #   address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: web
+
+# Descomentar para activar Let's Encrypt si tienes un dominio público:
+# certificatesResolvers:
+#   letsencrypt:
+#     acme:
+#       email: "tu-email@ejemplo.com"
+#       storage: "acme.json"
+#       httpChallenge:
+#         entryPoint: web

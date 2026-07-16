@@ -63,13 +63,38 @@ class CliDockerController(DockerControllerPort):
                 ports = ", ".join(ports_str_parts)
 
                 is_running = state.lower() == "running"
+                
+                memory_usage = "N/A"
+                if is_running:
+                    # Consultar stats del contenedor
+                    stat_code, stat_data = self._query_api(f"/containers/{cid}/stats?stream=false")
+                    if stat_code == 200:
+                        try:
+                            stats = json.loads(stat_data)
+                            mem_stats = stats.get("memory_stats", {})
+                            usage = mem_stats.get("usage", 0)
+                            limit = mem_stats.get("limit", 0)
+                            
+                            if limit > 0:
+                                def to_human(num_bytes):
+                                    for unit in ['B', 'KB', 'MB', 'GB']:
+                                        if num_bytes < 1024.0:
+                                            return f"{num_bytes:.1f} {unit}"
+                                        num_bytes /= 1024.0
+                                    return f"{num_bytes:.1f} TB"
+                                
+                                memory_usage = f"{to_human(usage)} / {to_human(limit)}"
+                        except Exception:
+                            pass
+
                 containers.append(DockerContainer(
                     id=cid,
                     name=name,
                     status=status,
                     image=image,
                     running=is_running,
-                    ports=ports
+                    ports=ports,
+                    memory_usage=memory_usage
                 ))
         except Exception as e:
             print(f"[Docker] Error al parsear JSON de Docker API: {e}")

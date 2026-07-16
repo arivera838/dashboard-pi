@@ -68,7 +68,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <i class="fa-solid fa-camera"></i> Cámaras
             </button>
             <button onclick="switchTab('network')" id="tab-btn-network" class="px-5 py-3 border-b-2 border-transparent text-gray-400 hover:text-white font-bold text-sm transition-all flex items-center gap-2">
-                <i class="fa-solid fa-wifi"></i> Clientes de Red
+                <i class="fa-solid fa-network-wired"></i> Clientes de Red
+            </button>
+            <button onclick="switchTab('cicd')" id="tab-btn-cicd" class="px-5 py-3 border-b-2 border-transparent text-gray-400 hover:text-white font-bold text-sm transition-all flex items-center gap-2">
+                <i class="fa-solid fa-rocket"></i> CI/CD & Despliegues
             </button>
         </div>
 
@@ -268,13 +271,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                         <th class="py-3 px-4 font-semibold">Contenedor</th>
                                         <th class="py-3 px-4 font-semibold">Imagen</th>
                                         <th class="py-3 px-4 font-semibold">Puertos</th>
+                                        <th class="py-3 px-4 font-semibold">Memoria</th>
                                         <th class="py-3 px-4 font-semibold">Estado</th>
                                         <th class="py-3 px-4 font-semibold text-right">Controles Rápidos</th>
                                     </tr>
                                 </thead>
                                 <tbody id="docker-list" class="divide-y divide-gray-800/50 text-sm">
                                     <tr>
-                                        <td colspan="5" class="py-8 text-center text-gray-500 text-xs">Cargando contenedores Docker activos...</td>
+                                        <td colspan="6" class="py-8 text-center text-gray-500 text-xs">Cargando contenedores Docker activos...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -442,6 +446,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- CI/CD Tab -->
+    <section id="tab-content-cicd" class="hidden space-y-6">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
+            <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                <i class="fa-solid fa-rocket text-indigo-400"></i> Despliegues Activos (Ramas)
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-800/50 text-gray-400 text-[10px] uppercase tracking-wider">
+                            <th class="py-3 px-4 font-semibold rounded-tl-lg">Repositorio / App</th>
+                            <th class="py-3 px-4 font-semibold">Rama / Ambiente</th>
+                            <th class="py-3 px-4 font-semibold">Estado</th>
+                            <th class="py-3 px-4 font-semibold">Subdominio Traefik</th>
+                            <th class="py-3 px-4 font-semibold text-right rounded-tr-lg">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cicd-deployments-list" class="text-sm">
+                        <tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">Cargando despliegues...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="bg-gray-950 border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                <i class="fa-solid fa-terminal text-emerald-400"></i> Consola de Build en Vivo
+            </h2>
+            <div class="bg-black border border-gray-800 rounded-lg p-4 font-mono text-xs overflow-y-auto h-64 text-gray-300" id="cicd-terminal">
+                <div class="text-gray-500 italic">Esperando eventos de Webhook...</div>
+            </div>
+        </div>
+    </section>
+
     <!-- Script de lógica e interacción en el Frontend -->
     <script>
         let activeTab = "dashboard";
@@ -454,12 +493,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById("tab-content-dashboard").classList.add("hidden");
             document.getElementById("tab-content-cameras").classList.add("hidden");
             document.getElementById("tab-content-network").classList.add("hidden");
+            document.getElementById("tab-content-cicd").classList.add("hidden");
 
             // Mostrar el activo
             document.getElementById(`tab-content-${tabId}`).classList.remove("hidden");
 
             // Actualizar diseño de botones
-            const tabs = ["dashboard", "cameras", "network"];
+            const tabs = ["dashboard", "cameras", "network", "cicd"];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-btn-${t}`);
                 if (t === tabId) {
@@ -545,7 +585,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function renderDocker(containers) {
             const tbody = document.getElementById("docker-list");
             if (!containers || containers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">No se encontraron contenedores Docker activos en esta Raspberry.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-500 text-xs">No se encontraron contenedores Docker activos en esta Raspberry.</td></tr>`;
                 return;
             }
 
@@ -557,6 +597,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </td>
                     <td class="py-3.5 px-4 text-xs code-font text-gray-400">${c.image}</td>
                     <td class="py-3.5 px-4 text-xs code-font text-gray-400">${c.ports || '—'}</td>
+                    <td class="py-3.5 px-4 text-xs code-font text-emerald-400">${c.memory_usage || 'N/A'}</td>
                     <td class="py-3.5 px-4">
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${c.running ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}">
                             <span class="h-1.5 w-1.5 rounded-full ${c.running ? 'bg-emerald-400' : 'bg-red-400'}"></span>
@@ -1112,3 +1153,120 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Centro de Control Raspberry Pi</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #030712;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .glass {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <!-- Glow Effects -->
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-md glass rounded-3xl p-8 shadow-2xl relative z-10">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white text-2xl font-bold shadow-lg shadow-emerald-500/20 mb-4">
+                <i class="fa-solid fa-microchip"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white">Centro de Control</h1>
+            <p class="text-xs text-gray-400 mt-1">Raspberry Pi 3 B+</p>
+        </div>
+
+        <form id="login-form" class="space-y-5">
+            <div>
+                <label for="username" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Usuario de la Raspberry</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                        <i class="fa-solid fa-user"></i>
+                    </span>
+                    <input type="text" id="username" name="username" required placeholder="ej: pi o ubuntu" 
+                        class="w-full bg-gray-950/80 border border-gray-800 text-white rounded-xl py-3 pl-10 pr-4 text-sm placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+                </div>
+            </div>
+
+            <div>
+                <label for="password" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Contraseña (sudo)</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                        <i class="fa-solid fa-lock"></i>
+                    </span>
+                    <input type="password" id="password" name="password" required placeholder="••••••••" 
+                        class="w-full bg-gray-950/80 border border-gray-800 text-white rounded-xl py-3 pl-10 pr-4 text-sm placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+                </div>
+            </div>
+
+            <div id="error-message" class="hidden text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+                Credenciales incorrectas. Intenta de nuevo.
+            </div>
+
+            <button type="submit" id="btn-submit"
+                class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] transition-all text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+            </button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById("login-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById("btn-submit");
+            const errDiv = document.getElementById("error-message");
+            
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Verificando...`;
+            errDiv.classList.add("hidden");
+
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            try {
+                const res = await fetch("/api/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (data.status === "success") {
+                    window.location.reload();
+                } else {
+                    errDiv.innerText = data.message || "Error al iniciar sesión.";
+                    errDiv.classList.remove("hidden");
+                }
+            } catch (err) {
+                errDiv.innerText = "Error de conexión con el servidor.";
+                errDiv.classList.remove("hidden");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión`;
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+

@@ -87,3 +87,13 @@ class NetworkPort(ABC):
     @abstractmethod
     def save_client_alias(self, mac: str, alias: str) -> bool:
         pass
+
+class GitPort(ABC):
+    @abstractmethod
+    def clone_or_pull(self, repo_url: str, branch: str, target_dir: str) -> tuple[bool, str]:
+        pass
+
+class NotificationPort(ABC):
+    @abstractmethod
+    def send_notification(self, title: str, message: str, status: str = "info") -> bool:
+        pass

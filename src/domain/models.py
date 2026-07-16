@@ -44,6 +44,7 @@ class DockerContainer:
     image: str
     running: bool
     ports: str
+    memory_usage: str = "N/A"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -52,7 +53,8 @@ class DockerContainer:
             "status": self.status,
             "image": self.image,
             "running": self.running,
-            "ports": self.ports
+            "ports": self.ports,
+            "memory_usage": self.memory_usage
         }
 
 @dataclass(frozen=True)
@@ -117,13 +119,47 @@ class WifiClient:
 class RecordingStatus:
     camera_id: str
     is_recording: bool
-    filepath: str
-    elapsed_time: int
+    recording_time: int
+    file_path: str | None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "camera_id": self.camera_id,
             "is_recording": self.is_recording,
-            "filepath": self.filepath,
-            "elapsed_time": self.elapsed_time
+            "recording_time": self.recording_time,
+            "file_path": self.file_path
+        }
+
+# CI/CD Models
+@dataclass(frozen=True)
+class WebhookPayload:
+    repo_name: str
+    repo_url: str
+    branch: str
+    commit_hash: str
+    commit_message: str
+    author: str
+    provider: str # github | gitlab
+    signature: str | None = None
+    raw_payload: str | bytes = ""
+
+@dataclass
+class BuildJob:
+    id: str
+    repo_name: str
+    branch: str
+    status: str # queued, building, success, failed
+    logs: List[str]
+    start_time: float
+    end_time: float | None = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "repo_name": self.repo_name,
+            "branch": self.branch,
+            "status": self.status,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "log_tail": self.logs[-50:] if self.logs else []
         }

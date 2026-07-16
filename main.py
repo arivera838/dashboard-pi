@@ -32,7 +32,7 @@ from src.application.services import (
 )
 from src.adapters.inbound.web_server import WebServer
 
-PORT = 8083
+PORT = int(os.environ.get("PORT", 8083))
 
 def main():
     # 1. Instanciar adaptadores de salida (infraestructura)
@@ -63,6 +63,16 @@ def main():
     update_vision_settings_service = UpdateVisionSettingsService(camera_adapter)
     save_client_alias_service = SaveClientAliasService(network_adapter)
 
+    # CI/CD Services
+    from src.adapters.outbound.git_manager import GitManagerAdapter
+    from src.adapters.outbound.notification_manager import NotificationManagerAdapter
+    from src.application.use_cases.cicd_use_cases import CICDManager, HandleWebhookUseCase
+    
+    git_manager = GitManagerAdapter()
+    notification_manager = NotificationManagerAdapter()
+    cicd_manager = CICDManager(git_manager, notification_manager)
+    webhook_use_case = HandleWebhookUseCase(cicd_manager)
+
     # 3. Instanciar y arrancar adaptador de entrada (servidor web) inyectando los casos de uso
     server = WebServer(
         port=PORT,
@@ -82,7 +92,8 @@ def main():
         list_recordings_use_case=list_recordings_service,
         get_vision_settings_use_case=get_vision_settings_service,
         update_vision_settings_use_case=update_vision_settings_service,
-        save_client_alias_use_case=save_client_alias_service
+        save_client_alias_use_case=save_client_alias_service,
+        webhook_use_case=webhook_use_case
     )
 
     server.start()
