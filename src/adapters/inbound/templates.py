@@ -33,7 +33,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <!-- Alerta Global de Despliegue en curso -->
     <div id="global-deploy-alert" class="bg-indigo-600 border-b border-indigo-500 text-white px-4 py-2.5 text-center text-xs font-bold flex items-center justify-center gap-2 hidden z-40 relative">
         <i class="fa-solid fa-spinner animate-spin"></i>
-        <span>Hay un despliegue de CI/CD ejecutándose en segundo plano para: <span id="global-deploy-app-name" class="underline"></span></span>
+        <span>Hay un despliegue de CI/CD ejecutándose en segundo plano para: <span id="global-deploy-app-name" class="underline"></span> (<span id="global-deploy-time">0s</span>)</span>
         <button onclick="focusDeploymentTab()" class="ml-4 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded text-[10px] uppercase font-bold tracking-wider transition-colors">Ver Progreso</button>
     </div>
 
@@ -239,9 +239,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                         <!-- Terminal Deployment Logs -->
                         <div id="logs-container" class="mt-6 hidden">
-                            <h3 class="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                                <i class="fa-solid fa-terminal text-emerald-400"></i> Log del Servidor en tiempo real:
-                            </h3>
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <i class="fa-solid fa-terminal text-emerald-400"></i> Log del Servidor en tiempo real:
+                                </h3>
+                                <span id="deploy-time-badge" class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20"></span>
+                            </div>
                             <pre id="deploy-logs" class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-xs text-emerald-400 code-font overflow-x-auto max-h-60 overflow-y-auto">Iniciando pipeline...</pre>
                         </div>
                     </div>
@@ -991,6 +994,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (form) form.scrollIntoView({ behavior: 'smooth' });
         }
 
+        function formatTime(sec) {
+            if (sec === undefined || sec === null) return "0s";
+            if (sec < 60) return `${sec}s`;
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m}m ${s}s`;
+        }
+
         let activeDeployPolling = null;
         let activeDeployApp = null;
 
@@ -1000,19 +1011,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const deployments = await res.json();
                 
                 let runningApp = null;
+                let runningSec = 0;
                 for (const app in deployments) {
                     if (deployments[app].status === "running") {
                         runningApp = app;
+                        runningSec = deployments[app].elapsed_seconds || 0;
                         break;
                     }
                 }
                 
                 const alertDiv = document.getElementById("global-deploy-alert");
                 const nameSpan = document.getElementById("global-deploy-app-name");
+                const globalTimeSpan = document.getElementById("global-deploy-time");
+                const badgeSpan = document.getElementById("deploy-time-badge");
                 
                 if (runningApp) {
                     nameSpan.innerText = runningApp;
+                    globalTimeSpan.innerText = formatTime(runningSec);
                     alertDiv.classList.remove("hidden");
+                    
+                    if (badgeSpan) {
+                        badgeSpan.innerText = `⏱️ En progreso: ${formatTime(runningSec)}`;
+                        badgeSpan.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-bold border border-indigo-500/20";
+                    }
                     
                     // Si detectamos que hay un deploy corriendo y no estamos sondeándolo en la UI local,
                     // activar la sincronización automáticamente
@@ -1037,6 +1058,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 logsPre.innerText = statusData.log || "Esperando logs...";
                                 logsPre.scrollTop = logsPre.scrollHeight;
                                 
+                                const elapsed = statusData.elapsed_seconds || 0;
+                                globalTimeSpan.innerText = formatTime(elapsed);
+                                if (badgeSpan) {
+                                    badgeSpan.innerText = `⏱️ En progreso: ${formatTime(elapsed)}`;
+                                }
+
                                 if (statusData.status !== "running") {
                                     clearInterval(activeDeployPolling);
                                     activeDeployPolling = null;
@@ -1045,10 +1072,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     btn.disabled = false;
                                     btn.innerHTML = `<i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue`;
                                     
-                                    if (statusData.status === "success") {
-                                        showToast("CI/CD Despliegue", "¡Tu aplicación se ha desplegado correctamente!", "success");
-                                    } else {
-                                        showToast("Error de Despliegue", "El proceso de despliegue ha fallado.", "error");
+                                    if (badgeSpan) {
+                                        if (statusData.status === "success") {
+                                            badgeSpan.innerText = `✅ Completado en: ${formatTime(elapsed)}`;
+                                            badgeSpan.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20";
+                                            showToast("CI/CD Despliegue", "¡Tu aplicación se ha desplegado correctamente!", "success");
+                                        } else {
+                                            badgeSpan.innerText = `❌ Fallido en: ${formatTime(elapsed)}`;
+                                            badgeSpan.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 font-bold border border-red-500/20";
+                                            showToast("Error de Despliegue", "El proceso de despliegue ha fallado.", "error");
+                                        }
                                     }
                                     refreshData();
                                 }

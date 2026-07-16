@@ -48,25 +48,30 @@ def create_handler_class(
         def log_message(self, format, *args):
             pass
 
+        def _send_json(self, data, status_code=200):
+            try:
+                self.send_response(status_code)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(data).encode("utf-8"))
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception:
+                pass
+
         def do_GET(self):
             url_parsed = urlparse(self.path)
             
             # 1. API: Obtener Métricas de Sistema (JSON)
             if url_parsed.path == "/api/status":
                 status = status_use_case.execute()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(status.to_dict()).encode("utf-8"))
+                self._send_json(status.to_dict())
                 return
 
             # 1.1 API: Obtener Logs de Contenedor Docker (JSON)
             elif url_parsed.path == "/api/docker/logs":
                 query_params = parse_qs(url_parsed.query)
                 container_id = query_params.get("id", [None])[0]
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
                 
                 if container_id:
                     success, logs = docker_logs_use_case.execute(container_id)
@@ -74,16 +79,13 @@ def create_handler_class(
                 else:
                     response_data = {"status": "error", "message": "Falta el ID del contenedor"}
                     
-                self.wfile.write(json.dumps(response_data).encode("utf-8"))
+                self._send_json(response_data)
                 return
 
             # 1.2 API: Obtener lista de cámaras
             elif url_parsed.path == "/api/camera/list":
                 cameras = get_cameras_use_case.execute()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps([c.to_dict() for c in cameras]).encode("utf-8"))
+                self._send_json([c.to_dict() for c in cameras])
                 return
 
             # 1.3 API: Capturar frame de cámara (Retorna imagen directa)
@@ -211,10 +213,7 @@ def create_handler_class(
                 app_name = query_params.get("app_name", [None])[0]
                 if app_name:
                     status = get_deploy_status_use_case.execute(app_name)
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(status).encode("utf-8"))
+                    self._send_json(status)
                 else:
                     self.send_error(400, "Falta el nombre de la app")
                 return
@@ -222,19 +221,13 @@ def create_handler_class(
             # 1.395 API: Listar todos los despliegues activos y pasados
             elif url_parsed.path == "/api/cicd/deployments":
                 status = list_deployments_use_case.execute()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(status).encode("utf-8"))
+                self._send_json(status)
                 return
 
             # 1.4 API: Clientes de red conectados
             elif url_parsed.path == "/api/network/clients":
                 clients = get_wifi_clients_use_case.execute()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps([c.to_dict() for c in clients]).encode("utf-8"))
+                self._send_json([c.to_dict() for c in clients])
                 return
 
             # 2. Servir la interfaz gráfica principal
@@ -256,10 +249,6 @@ def create_handler_class(
                 params = json.loads(post_data)
             except Exception:
                 params = {}
-
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
 
             response_data = {"status": "error", "message": "Acción no reconocida"}
 
@@ -324,7 +313,7 @@ def create_handler_class(
                 else:
                     response_data = {"status": "error", "message": "Faltan parametros mac o alias"}
 
-            self.wfile.write(json.dumps(response_data).encode("utf-8"))
+            self._send_json(response_data)
 
     return DashboardRequestHandler
 

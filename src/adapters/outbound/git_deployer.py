@@ -25,21 +25,42 @@ class SubprocessDeployer(DeployerPort):
     def get_deploy_status(self, app_name: str) -> dict:
         if app_name not in self._active_logs:
             return {"status": "idle", "log": "Esperando inicio..."}
-        return self._active_logs[app_name]
+        status = dict(self._active_logs[app_name])
+        start_time = status.get("start_time")
+        if start_time:
+            end_time = status.get("end_time") or time.time()
+            status["elapsed_seconds"] = int(end_time - start_time)
+        return status
 
     def get_all_deployments(self) -> dict:
-        # Retornar una copia para evitar problemas de concurrencia
-        return dict(self._active_logs)
+        copy_logs = {}
+        for app, data in self._active_logs.items():
+            app_data = dict(data)
+            start_time = app_data.get("start_time")
+            if start_time:
+                end_time = app_data.get("end_time") or time.time()
+                app_data["elapsed_seconds"] = int(end_time - start_time)
+            copy_logs[app] = app_data
+        return copy_logs
 
     def _run_deploy_thread(self, repo_url: str, target_dir: str | None, app_name: str):
         self._active_logs[app_name] = {
             "status": "running",
-            "log": "🚀 [CI/CD] Iniciando pipeline de despliegue...\n"
+            "log": "🚀 [CI/CD] Iniciando pipeline de despliegue...\n",
+            "start_time": time.time(),
+            "end_time": None
         }
 
         try:
             # 1. Asegurar ruta destino limpia
-            base_path = os.path.expanduser(f"~/apps/{app_name}")
+            # Resolver la ruta de home del usuario real (evita usar /home/frivera o /root bajo sudo)
+            sudo_user = os.environ.get("SUDO_USER")
+            if sudo_user and sudo_user != "root":
+                home_dir = f"/home/{sudo_user}"
+            else:
+                home_dir = os.path.expanduser("~")
+                
+            base_path = os.path.join(home_dir, "apps", app_name)
             if target_dir:
                 base_path = os.path.abspath(target_dir)
 
@@ -103,3 +124,5 @@ class SubprocessDeployer(DeployerPort):
         except Exception as e:
             self._active_logs[app_name]["status"] = "error"
             self._active_logs[app_name]["log"] += f"\n❌ [ERROR CRÍTICO] Excepción ocurrida: {str(e)}\n"
+        finally:
+            self._active_logs[app_name]["end_time"] = time.time()
