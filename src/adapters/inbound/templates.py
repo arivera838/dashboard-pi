@@ -919,7 +919,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 </div>
                             </td>
                             <td class="py-3.5 px-4 code-font text-emerald-400">${client.ip}</td>
-                            <td class="py-3.5 px-4 code-font text-gray-400">${client.mac}</td>
+                            <td class="py-3.5 px-4">
+                                <div class="code-font text-gray-400">${client.mac}</div>
+                                <div class="text-[10px] text-gray-500 font-sans font-semibold mt-0.5 uppercase tracking-wider">${client.manufacturer || 'Desconocido'}</div>
+                            </td>
                             <td class="py-3.5 px-4 text-xs font-semibold text-gray-500 uppercase">${client.device}</td>
                             <td class="py-3.5 px-4 text-right">
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${badgeColor}">

@@ -7,9 +7,14 @@ from typing import List, Dict
 from src.domain.models import CameraInfo, RecordingStatus
 from src.application.ports.outputs import CameraPort
 
-# Silenciar advertencias internas de la librería de C++ de OpenCV y GStreamer
+# Silenciar advertencias internas y prevenir crashes de OpenMP/libgomp en ARM (Raspberry Pi)
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 os.environ["GST_DEBUG"] = "0"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 try:
     import numpy as np

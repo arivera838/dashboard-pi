@@ -131,12 +131,16 @@ class LinuxNetworkAdapter(NetworkPort):
             # Calcular ancho de banda consumido en tiempo real
             bandwidth = self._get_simulated_bandwidth(mac, hostname)
             
+            # Obtener fabricante (OUI) a través de caché o API
+            manufacturer = self._get_mac_vendor(mac)
+            
             clients.append(WifiClient(
                 ip=ip,
                 mac=mac,
                 device=dev,
                 hostname=hostname,
-                bandwidth=bandwidth
+                bandwidth=bandwidth,
+                manufacturer=manufacturer
             ))
 
         # 4. Si no hay dispositivos detectados (ej: macOS en desarrollo local), inyectar mocks con alias
@@ -188,6 +192,43 @@ class LinuxNetworkAdapter(NetworkPort):
                 return "0 KB/s"
             val = random.uniform(1.5, 180)
             return f"{val:.1f} KB/s"
+
+    def _get_mac_vendor(self, mac: str) -> str:
+        cache_file = "./recordings/mac_vendors_cache.json"
+        cache = {}
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r") as f:
+                    cache = json.load(f)
+            except Exception:
+                pass
+        
+        if mac in cache:
+            return cache[mac]
+            
+        oui = mac.replace(":", "").upper()[:6]
+        # Hardcoded fallbacks first (to avoid API calls for RPi, Apple defaults etc)
+        if oui in ["B827EB", "DCA632", "E45F01"]:
+            vendor = "Raspberry Pi Foundation"
+        else:
+            # Online lookup using api.macvendors.com
+            try:
+                import urllib.request
+                req = urllib.request.Request(f"https://api.macvendors.com/{mac}", headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=1.0) as response:
+                    vendor = response.read().decode('utf-8').strip()
+            except Exception:
+                vendor = "Desconocido"
+                
+        # Store in cache
+        cache[mac] = vendor
+        try:
+            with open(cache_file, "w") as f:
+                json.dump(cache, f)
+        except Exception:
+            pass
+            
+        return vendor
 
     def _async_ping_sweep(self):
         if not self._scan_lock.acquire(blocking=False):
