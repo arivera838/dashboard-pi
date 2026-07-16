@@ -1,12 +1,18 @@
 FROM python:3.11-slim
 
-# Instalar dependencias necesarias del sistema (Git, Docker CLI, libcamera-tools para libcamerify y fswebcam)
+# Instalar dependencias necesarias del sistema (Git, Docker CLI, libcamera, y GStreamer con plugins)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
     fswebcam \
     libcamera-tools \
+    libcamera-v4l2 \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-libcamera \
     && curl -fsSL https://get.docker.com | sh \
     && rm -rf /var/lib/apt/lists/*
 
