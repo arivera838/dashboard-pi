@@ -32,7 +32,7 @@ from src.application.services import (
 )
 from src.adapters.inbound.web_server import WebServer
 
-PORT = 8080
+PORT = 8083
 
 def main():
     # 1. Instanciar adaptadores de salida (infraestructura)

@@ -362,11 +362,22 @@ class WebServer:
         )
 
     def start(self):
+        import socket
+        local_ip = "localhost"
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            pass
+
         socketserver.TCPServer.allow_reuse_address = True
         with socketserver.TCPServer(("", self.port), self.handler_class) as httpd:
             print(f"==========================================================")
             print(f"🚀 ¡CENTRO DE CONTROL RASPBERRY PI 3 B+ INICIADO!")
-            print(f"👉 Accede desde tu red en: http://localhost:{self.port}")
+            print(f"👉 Local:   http://localhost:{self.port}")
+            print(f"👉 En Red:  http://{local_ip}:{self.port}")
             print(f"==========================================================")
             try:
                 httpd.serve_forever()
