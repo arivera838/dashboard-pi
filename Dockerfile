@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Instalar dependencias necesarias del sistema (Git, Docker CLI, libcamera, y GStreamer con plugins)
+# Instalar dependencias necesarias del sistema (Git, Docker CLI, libcamera, GStreamer y arp-scan)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-libcamera \
+    arp-scan \
     && curl -fsSL https://get.docker.com | sh \
     && rm -rf /var/lib/apt/lists/*
 

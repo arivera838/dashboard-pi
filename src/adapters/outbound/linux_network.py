@@ -51,8 +51,11 @@ class LinuxNetworkAdapter(NetworkPort):
         # 1. Intentar descubrir dispositivos silenciosos e iOS usando arp-scan (si está instalado en RPi)
         arp_scan_devices: Dict[str, str] = {}
         try:
-            # arp-scan -l -q -g envía paquetes ARP directamente (elude firewalls de iOS/Smartphones)
-            res = subprocess.run(["sudo", "arp-scan", "-l", "-q"], capture_output=True, text=True, timeout=2.5)
+            import shutil
+            has_sudo = shutil.which("sudo") is not None
+            cmd = ["sudo", "arp-scan", "-l", "-q"] if has_sudo else ["arp-scan", "-l", "-q"]
+            # arp-scan -l -q envía paquetes ARP directamente (elude firewalls de iOS/Smartphones)
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=2.5)
             for line in res.stdout.split("\n"):
                 parts = line.strip().split()
                 if len(parts) >= 2:
