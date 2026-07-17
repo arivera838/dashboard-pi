@@ -26,7 +26,8 @@ from src.application.ports.inputs import (
     ListRecordingsUseCase,
     GetVisionSettingsUseCase,
     UpdateVisionSettingsUseCase,
-    SaveClientAliasUseCase
+    SaveClientAliasUseCase,
+    CancelDeploymentUseCase
 )
 
 def create_handler_class(
