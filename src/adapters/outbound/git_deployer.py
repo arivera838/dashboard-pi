@@ -84,7 +84,11 @@ class SubprocessDeployer(DeployerPort):
                 base_path = os.path.abspath(target_dir)
 
             # 2. Clonar o realizar Pull
-            if not os.path.exists(base_path):
+            git_dir = os.path.join(base_path, ".git")
+            if not os.path.exists(git_dir):
+                if os.path.exists(base_path):
+                    import shutil
+                    shutil.rmtree(base_path, ignore_errors=True)
                 self._active_logs[app_name]["log"] += f"📂 [Git] Clonando repositorio (rama {branch}) en {base_path}...\n"
                 cmd = f"git clone -b {branch} {repo_url} {base_path}"
             else:
