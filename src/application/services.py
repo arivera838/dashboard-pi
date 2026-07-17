@@ -107,7 +107,7 @@ class ListDeploymentsService(ListDeploymentsUseCase):
                 name = p["name"]
                 if name not in deployments:
                     deployments[name] = {
-                        "status": p["status"],
+                        "status": "success" if p["status"] == "running" else p["status"],
                         "log": "Proyecto detectado de forma autónoma corriendo en Docker.",
                         "subdomain": p["subdomain"],
                         "start_time": time.time(),
@@ -115,8 +115,6 @@ class ListDeploymentsService(ListDeploymentsUseCase):
                         "elapsed_seconds": 0
                     }
                 else:
-                    if p["status"] == "running":
-                        deployments[name]["status"] = "running"
                     deployments[name]["subdomain"] = p["subdomain"]
         except Exception as e:
             print(f"[ListDeploymentsService] Error al escanear proyectos compose: {e}")
