@@ -17,7 +17,8 @@ from src.application.ports.inputs import (
     ListRecordingsUseCase,
     GetVisionSettingsUseCase,
     UpdateVisionSettingsUseCase,
-    SaveClientAliasUseCase
+    SaveClientAliasUseCase,
+    CancelDeploymentUseCase
 )
 from src.application.ports.outputs import (
     SystemMetricsRepositoryPort,

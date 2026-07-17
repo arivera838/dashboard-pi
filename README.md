@@ -76,3 +76,7 @@ Esta es la opción recomendada si vas a utilizar el flujo de video en tiempo rea
 * **Control de Interfaz de Escritorio**: Encendido y apagado del servidor de ventanas (`lightdm`) para liberar ~200MB de memoria RAM cuando no se use un monitor físico.
 * **Administración de Docker**: Listado de contenedores instalados con capacidad de Encender, Apagar y Reiniciar contenedores desde la UI.
 * **Despliegues Automáticos (CI/CD)**: Clona cualquier repositorio HTTPS de Git público y, si incluye un archivo `docker-compose.yml`, levanta los servicios construyendo las imágenes en segundo plano.
+
+
+
+twilio 1THJY3HDAV7YJ9HNY31YEUBV

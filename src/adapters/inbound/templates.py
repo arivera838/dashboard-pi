@@ -951,6 +951,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        async function cancelActiveDeploy() {
+            if (!activeDeployApp) {
+                showToast("Atención", "No hay despliegue activo para cancelar en esta pestaña.", "error");
+                return;
+            }
+            if (!confirm(`¿Estás seguro de cancelar el despliegue actual de ${activeDeployApp}?`)) return;
+
+            const cancelBtn = document.getElementById("btn-cancel-deploy");
+            if (cancelBtn) cancelBtn.disabled = true;
+            
+            try {
+                const res = await fetch("/api/cicd/deploy/cancel", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ app_name: activeDeployApp })
+                });
+                const result = await res.json();
+                
+                if (result.status === "success") {
+                    showToast("Cancelado", result.message, "success");
+                } else {
+                    showToast("Error", result.message, "error");
+                }
+            } catch (err) {
+                showToast("Error", "La petición de cancelación falló.", "error");
+            } finally {
+                if (cancelBtn) cancelBtn.disabled = false;
+            }
+        }
+
         // --- MÉTODOS DE CÁMARAS ---
         async function loadCameraList() {
             try {
@@ -1305,10 +1335,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         const logsContainer = document.getElementById("logs-container");
                         const logsPre = document.getElementById("deploy-logs");
                         const btn = document.getElementById("deploy-btn");
+                        const cancelBtn = document.getElementById("btn-cancel-deploy");
                         
                         logsContainer.classList.remove("hidden");
                         btn.disabled = true;
                         btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Desplegando app en segundo plano...`;
+                        if (cancelBtn) cancelBtn.classList.remove("hidden");
                         
                         if (activeDeployPolling) clearInterval(activeDeployPolling);
                         
@@ -1333,6 +1365,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     alertDiv.classList.add("hidden");
                                     btn.disabled = false;
                                     btn.innerHTML = `<i class="fa-solid fa-code-branch"></i> Lanzar pipeline de Despliegue`;
+                                    if (cancelBtn) cancelBtn.classList.add("hidden");
                                     
                                     if (badgeSpan) {
                                         if (statusData.status === "success") {
