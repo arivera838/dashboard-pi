@@ -1705,6 +1705,112 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        async function openWifiModal() {
+            document.getElementById('wifi-modal').classList.remove('hidden');
+            document.getElementById('wifi-loader').classList.remove('hidden');
+            document.getElementById('wifi-list').classList.add('hidden');
+            document.getElementById('wifi-connect-box').classList.add('hidden');
+            
+            try {
+                const res = await fetch("/api/wifi/scan");
+                const data = await res.json();
+                
+                document.getElementById('wifi-loader').classList.add('hidden');
+                
+                if (data.status === 'success' && data.networks.length > 0) {
+                    const listHtml = data.networks.map(n => `
+                        <button onclick="selectWifi('${n.ssid}')" class="w-full text-left bg-gray-800 hover:bg-gray-700 p-3 rounded-lg flex justify-between items-center transition-colors">
+                            <span class="text-white font-semibold">${n.ssid}</span>
+                            <span class="text-xs ${n.signal > 70 ? 'text-emerald-400' : 'text-yellow-400'}">Señal: ${n.signal}%</span>
+                        </button>
+                    `).join('');
+                    document.getElementById('wifi-list').innerHTML = listHtml;
+                    document.getElementById('wifi-list').classList.remove('hidden');
+                } else {
+                    document.getElementById('wifi-list').innerHTML = '<p class="text-center text-gray-400 text-sm py-4">No se encontraron redes.</p>';
+                    document.getElementById('wifi-list').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('wifi-loader').classList.add('hidden');
+                showToast("WiFi", "Error escaneando redes", "error");
+            }
+        }
+        
+        function closeWifiModal() {
+            document.getElementById('wifi-modal').classList.add('hidden');
+        }
+        
+        function selectWifi(ssid) {
+            document.getElementById('wifi-selected-ssid').textContent = ssid;
+            document.getElementById('wifi-password').value = '';
+            document.getElementById('wifi-connect-box').classList.remove('hidden');
+            document.getElementById('wifi-list').classList.add('hidden');
+        }
+        
+        function cancelWifiConnect() {
+            document.getElementById('wifi-connect-box').classList.add('hidden');
+            document.getElementById('wifi-list').classList.remove('hidden');
+        }
+        
+        async function connectWifi() {
+            const ssid = document.getElementById('wifi-selected-ssid').textContent;
+            const password = document.getElementById('wifi-password').value;
+            const icon = document.getElementById('wifi-connecting-icon');
+            
+            icon.classList.remove('hidden');
+            
+            try {
+                const res = await fetch("/api/wifi/connect", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ssid, password})
+                });
+                const data = await res.json();
+                icon.classList.add('hidden');
+                if (data.status === 'success') {
+                    showToast("WiFi", `Conectado a ${ssid} exitosamente`, "success");
+                    closeWifiModal();
+                } else {
+                    showToast("WiFi Error", data.message, "error");
+                }
+            } catch (err) {
+                icon.classList.add('hidden');
+                showToast("WiFi", "Error al intentar conectar", "error");
+            }
+        }
+        
+        function playVideo(filename) {
+            const player = document.getElementById('video-player');
+            player.src = `/api/camera/recordings/play?file=${filename}`;
+            document.getElementById('video-title').textContent = filename;
+            document.getElementById('video-modal').classList.remove('hidden');
+        }
+        
+        function closeVideoModal() {
+            const player = document.getElementById('video-player');
+            player.pause();
+            player.src = '';
+            document.getElementById('video-modal').classList.add('hidden');
+        }
+        
+        async function deleteRecording(filename) {
+            if (!confirm(`¿Estás seguro de que deseas eliminar la grabación ${filename}?`)) return;
+            
+            try {
+                const res = await fetch(`/api/camera/recordings?file=${filename}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    showToast("Cámara", `Grabación ${filename} eliminada`, "success");
+                    loadRecordings();
+                } else {
+                    showToast("Error", data.message, "error");
+                }
+            } catch (err) {
+                showToast("Error", "No se pudo eliminar la grabación", "error");
+            }
+        }
+
         setInterval(refreshData, 4000);
         setInterval(checkActiveDeployments, 4000);
         setInterval(refreshNetworkClients, 4000);
