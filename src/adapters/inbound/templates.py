@@ -373,9 +373,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <h2 class="text-lg font-bold flex items-center gap-2">
                         <i class="fa-solid fa-wifi text-sky-400"></i> Dispositivos Conectados en la Red Local
                     </h2>
-                    <button onclick="refreshNetworkClients()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
-                        <i class="fa-solid fa-arrows-rotate"></i>
-                    </button>
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ancho de Banda Total:</span>
+                            <span id="total-bandwidth-indicator" class="text-sm font-bold text-sky-400 code-font bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/20">0.00 KB/s</span>
+                        </div>
+                        <label class="flex items-center cursor-pointer gap-2" title="Alertar cuando se conecte cualquier dispositivo nuevo">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Alerta Global</span>
+                            <div class="relative">
+                                <input type="checkbox" id="global-alert-toggle" class="sr-only" onchange="saveGlobalAlertPreference()">
+                                <div class="block bg-gray-800 w-10 h-6 rounded-full border border-gray-700 transition-colors" id="global-alert-bg"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform" id="global-alert-dot"></div>
+                            </div>
+                        </label>
+                        <button onclick="refreshNetworkClients()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
@@ -450,6 +464,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Nombre Personalizado (Alias)</label>
                     <input type="text" id="alias-name" class="w-full bg-gray-950 border border-gray-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors" placeholder="Ej. Mi Laptop Principal">
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-800">
+                    <label class="flex items-center cursor-pointer gap-3">
+                        <input type="checkbox" id="alias-alert-toggle" class="form-checkbox h-5 w-5 text-emerald-500 rounded bg-gray-950 border-gray-700 focus:ring-emerald-500 focus:ring-offset-gray-900">
+                        <span class="text-sm font-semibold text-gray-300">Alertarme cuando este dispositivo se conecte</span>
+                    </label>
+                    <p class="text-[10px] text-gray-500 mt-1 ml-8">Reproducirá un sonido especial si este dispositivo aparece en la red.</p>
                 </div>
                 <div class="flex justify-end gap-3 pt-2">
                     <button onclick="closeAliasModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-bold transition-all">Cancelar</button>
@@ -1182,17 +1203,114 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return "fa-laptop-code text-gray-400";
         }
 
+        let knownMacs = new Set();
+        let isFirstScan = true;
+
+        function playNetworkAlert() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) {
+                console.log("Audio not supported", e);
+            }
+        }
+
+        function loadGlobalAlertPreference() {
+            const toggle = document.getElementById("global-alert-toggle");
+            const bg = document.getElementById("global-alert-bg");
+            const dot = document.getElementById("global-alert-dot");
+            const isEnabled = localStorage.getItem("globalNetworkAlert") === "true";
+            
+            if (toggle) {
+                toggle.checked = isEnabled;
+                if (isEnabled) {
+                    bg.classList.replace("bg-gray-800", "bg-sky-500");
+                    dot.classList.add("translate-x-4");
+                } else {
+                    bg.classList.replace("bg-sky-500", "bg-gray-800");
+                    dot.classList.remove("translate-x-4");
+                }
+            }
+        }
+
+        function saveGlobalAlertPreference() {
+            const toggle = document.getElementById("global-alert-toggle");
+            const bg = document.getElementById("global-alert-bg");
+            const dot = document.getElementById("global-alert-dot");
+            
+            localStorage.setItem("globalNetworkAlert", toggle.checked ? "true" : "false");
+            
+            if (toggle.checked) {
+                bg.classList.replace("bg-gray-800", "bg-sky-500");
+                dot.classList.add("translate-x-4");
+                showToast("Alerta Global Activada", "Recibirás una notificación cuando cualquier dispositivo se conecte.");
+            } else {
+                bg.classList.replace("bg-sky-500", "bg-gray-800");
+                dot.classList.remove("translate-x-4");
+                showToast("Alerta Global Desactivada", "Ya no recibirás alertas globales.");
+            }
+        }
+
         async function refreshNetworkClients() {
             const tbody = document.getElementById("network-clients-list");
-            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">Escaneando red local...</td></tr>`;
+            if (isFirstScan) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">Escaneando red local...</td></tr>`;
+            }
             try {
                 const res = await fetch("/api/network/clients");
                 const clients = await res.json();
                 
                 if (!clients || clients.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-500 text-xs">No se detectaron dispositivos de red conectados.</td></tr>`;
+                    document.getElementById("total-bandwidth-indicator").innerText = "0.00 KB/s";
                     return;
                 }
+
+                let totalKB = 0;
+                let currentMacs = new Set();
+                let newDevicesConnected = [];
+                const globalAlert = localStorage.getItem("globalNetworkAlert") === "true";
+                const specificAlerts = JSON.parse(localStorage.getItem("specificNetworkAlerts") || "[]");
+
+                clients.forEach(c => {
+                    currentMacs.add(c.mac);
+                    
+                    // Parse bandwidth for total sum
+                    let bw = c.bandwidth || "0 KB/s";
+                    let num = parseFloat(bw);
+                    if (!isNaN(num)) {
+                        if (bw.includes("MB/s")) totalKB += num * 1024;
+                        else if (bw.includes("KB/s")) totalKB += num;
+                    }
+
+                    // Check for new devices (if not first scan)
+                    if (!isFirstScan && !knownMacs.has(c.mac)) {
+                        if (globalAlert || specificAlerts.includes(c.mac)) {
+                            newDevicesConnected.push(c.hostname || c.device || c.mac);
+                        }
+                    }
+                });
+
+                if (newDevicesConnected.length > 0) {
+                    playNetworkAlert();
+                    showToast("Nuevo Dispositivo Conectado", `Se ha conectado: ${newDevicesConnected.join(", ")}`, "success");
+                }
+
+                knownMacs = currentMacs;
+                isFirstScan = false;
+
+                // Update Total Bandwidth UI
+                let totalStr = totalKB > 1024 ? (totalKB / 1024).toFixed(2) + " MB/s" : totalKB.toFixed(2) + " KB/s";
+                document.getElementById("total-bandwidth-indicator").innerText = totalStr;
 
                 tbody.innerHTML = clients.map(client => {
                     const isIdle = client.bandwidth === "0 KB/s";
@@ -1236,6 +1354,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function openAliasModal(mac, currentAlias) {
             document.getElementById("alias-mac").value = mac;
             document.getElementById("alias-name").value = currentAlias === "Dispositivo sin nombre" ? "" : currentAlias;
+            
+            const specificAlerts = JSON.parse(localStorage.getItem("specificNetworkAlerts") || "[]");
+            document.getElementById("alias-alert-toggle").checked = specificAlerts.includes(mac);
+            
             document.getElementById("alias-modal").classList.remove("hidden");
         }
 
@@ -1246,6 +1368,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         async function saveAlias() {
             const mac = document.getElementById("alias-mac").value;
             const alias = document.getElementById("alias-name").value;
+            const alertEnabled = document.getElementById("alias-alert-toggle").checked;
+
+            // Guardar preferencia de alerta
+            let specificAlerts = JSON.parse(localStorage.getItem("specificNetworkAlerts") || "[]");
+            if (alertEnabled && !specificAlerts.includes(mac)) {
+                specificAlerts.push(mac);
+            } else if (!alertEnabled && specificAlerts.includes(mac)) {
+                specificAlerts = specificAlerts.filter(m => m !== mac);
+            }
+            localStorage.setItem("specificNetworkAlerts", JSON.stringify(specificAlerts));
 
             try {
                 const res = await fetch("/api/network/alias", {
@@ -1255,7 +1387,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 });
                 const result = await res.json();
                 if (result.status === "success") {
-                    showToast("Red WiFi", "Nombre personalizado guardado correctamente", "success");
+                    showToast("Red WiFi", "Configuración de dispositivo guardada correctamente", "success");
                     closeAliasModal();
                     refreshNetworkClients();
                 } else {
@@ -1465,6 +1597,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         setInterval(refreshData, 4000);
         setInterval(checkActiveDeployments, 4000);
         initDeploymentsForm();
+        loadGlobalAlertPreference();
     </script>
 </body>
 </html>
