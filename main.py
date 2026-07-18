@@ -30,7 +30,8 @@ from src.application.services import (
     GetVisionSettingsService,
     UpdateVisionSettingsService,
     SaveClientAliasService,
-    CancelDeploymentService
+    CancelDeploymentService,
+    GetGitBranchesService
 )
 from src.adapters.inbound.web_server import WebServer
 
@@ -76,6 +77,7 @@ def main():
     webhook_use_case = HandleWebhookUseCase(cicd_manager)
 
     cancel_deploy_service = CancelDeploymentService(deployer)
+    get_git_branches_service = GetGitBranchesService()
 
     # 3. Instanciar y arrancar adaptador de entrada (servidor web) inyectando los casos de uso
     server = WebServer(
@@ -98,7 +100,8 @@ def main():
         get_vision_settings_use_case=get_vision_settings_service,
         update_vision_settings_use_case=update_vision_settings_service,
         save_client_alias_use_case=save_client_alias_service,
-        webhook_use_case=webhook_use_case
+        webhook_use_case=webhook_use_case,
+        get_git_branches_use_case=get_git_branches_service
     )
 
     server.start()

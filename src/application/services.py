@@ -18,7 +18,8 @@ from src.application.ports.inputs import (
     GetVisionSettingsUseCase,
     UpdateVisionSettingsUseCase,
     SaveClientAliasUseCase,
-    CancelDeploymentUseCase
+    CancelDeploymentUseCase,
+    GetGitBranchesUseCase
 )
 from src.application.ports.outputs import (
     SystemMetricsRepositoryPort,
@@ -197,3 +198,39 @@ class SaveClientAliasService(SaveClientAliasUseCase):
         if success:
             return True, f"Alias guardado con éxito para {mac}"
         return False, "No se pudo guardar el alias para este dispositivo"
+
+class GetGitBranchesService(GetGitBranchesUseCase):
+    def execute(self, repo_url: str) -> tuple[bool, list[str] | str]:
+        import subprocess
+        try:
+            # Ejecutamos git ls-remote sin prompt de contraseña y con timeout de 10s
+            result = subprocess.run(
+                ["git", "ls-remote", "--heads", repo_url],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env={"GIT_TERMINAL_PROMPT": "0"}
+            )
+            
+            if result.returncode != 0:
+                return False, f"Error al acceder al repositorio: {result.stderr.strip()}"
+            
+            branches = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    # El formato es: <hash>\trefs/heads/<branch>
+                    parts = line.split('\t')
+                    if len(parts) == 2:
+                        ref = parts[1]
+                        branch = ref.replace("refs/heads/", "")
+                        branches.append(branch)
+            
+            if not branches:
+                return False, "No se encontraron ramas en el repositorio."
+                
+            return True, branches
+            
+        except subprocess.TimeoutExpired:
+            return False, "Tiempo de espera agotado al conectar con el repositorio."
+        except Exception as e:
+            return False, f"Error inesperado: {str(e)}"

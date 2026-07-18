@@ -49,7 +49,8 @@ def create_handler_class(
     get_vision_settings_use_case: GetVisionSettingsUseCase,
     update_vision_settings_use_case: UpdateVisionSettingsUseCase,
     save_client_alias_use_case: SaveClientAliasUseCase,
-    webhook_use_case=None
+    webhook_use_case=None,
+    get_git_branches_use_case=None
 ):
     class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -220,6 +221,35 @@ def create_handler_class(
                     self.send_error(400, "Nombre de archivo invalido")
                     return
                 
+                # API: Webhook para GitHub
+            elif url_parsed.path == "/api/cicd/github/webhook":
+                if not webhook_use_case:
+                    self.send_error(501, "Módulo de webhooks no habilitado")
+                    return
+                # handled by do_POST
+                pass
+
+            # API: Obtener ramas de un repositorio git remoto
+            elif url_parsed.path == "/api/cicd/git/branches":
+                query_params = parse_qs(url_parsed.query)
+                repo_url = query_params.get("repo_url", [None])[0]
+                
+                if not repo_url:
+                    self._send_json({"status": "error", "message": "Falta la URL del repositorio"}, 400)
+                    return
+                    
+                if not get_git_branches_use_case:
+                    self._send_json({"status": "error", "message": "Caso de uso no inyectado"}, 500)
+                    return
+                    
+                success, data = get_git_branches_use_case.execute(repo_url)
+                if success:
+                    self._send_json({"status": "success", "branches": data})
+                else:
+                    self._send_json({"status": "error", "message": data}, 400)
+                return
+
+            elif url_parsed.path == "/api/camera/recordings/download":
                 filepath = os.path.join("./recordings", filename)
                 if not os.path.exists(filepath):
                     self.send_error(404, "Archivo no encontrado")
@@ -506,7 +536,8 @@ class WebServer:
         get_vision_settings_use_case: GetVisionSettingsUseCase,
         update_vision_settings_use_case: UpdateVisionSettingsUseCase,
         save_client_alias_use_case: SaveClientAliasUseCase,
-        webhook_use_case=None
+        webhook_use_case=None,
+        get_git_branches_use_case=None
     ):
         self.port = port
         self.handler_class = create_handler_class(
@@ -528,7 +559,8 @@ class WebServer:
             get_vision_settings_use_case,
             update_vision_settings_use_case,
             save_client_alias_use_case,
-            webhook_use_case
+            webhook_use_case,
+            get_git_branches_use_case
         )
 
     def start(self):

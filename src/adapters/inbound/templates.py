@@ -224,8 +224,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     <input type="text" id="deploy-name" placeholder="ej. mi-chatbot-telegram" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-400 mb-1">Rama (Git Branch)</label>
-                                    <input type="text" id="deploy-branch" placeholder="ej. main, dev, stage" value="main" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                    <label class="block text-xs font-semibold text-gray-400 mb-1 flex justify-between">
+                                        <span>Rama (Git Branch)</span>
+                                        <span id="branch-loader" class="text-indigo-400 hidden"><i class="fa-solid fa-circle-notch fa-spin"></i> Cargando...</span>
+                                    </label>
+                                    <select id="deploy-branch" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                        <option value="main">main</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Ruta Destino (Opcional)</label>
@@ -234,7 +239,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-400 mb-1">URL del Repositorio Git (HTTPS)</label>
-                                <input type="url" id="deploy-repo" placeholder="https://github.com/usuario/mi-repositorio.git" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                <input type="url" id="deploy-repo" list="deployed-apps-datalist" placeholder="https://github.com/usuario/mi-repositorio.git" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500" onblur="fetchBranches()">
+                                <datalist id="deployed-apps-datalist"></datalist>
                             </div>
 
                             <div class="flex justify-end gap-3 pt-2">
@@ -1402,8 +1408,63 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         // Polling constante cada 4 segundos
         refreshData();
         checkActiveDeployments();
+        async function initDeploymentsForm() {
+            try {
+                const res = await fetch("/api/cicd/deployments");
+                const deployments = await res.json();
+                const datalist = document.getElementById("deployed-apps-datalist");
+                datalist.innerHTML = "";
+                for (const app in deployments) {
+                    const option = document.createElement("option");
+                    option.value = `https://github.com/afrivera/${app}.git`;
+                    datalist.appendChild(option);
+                }
+            } catch (err) {
+                console.error("Error populating deployments form:", err);
+            }
+        }
+
+        let fetchBranchesTimeout = null;
+        function fetchBranchesDebounced() {
+            if (fetchBranchesTimeout) clearTimeout(fetchBranchesTimeout);
+            fetchBranchesTimeout = setTimeout(fetchBranches, 500);
+        }
+
+        async function fetchBranches() {
+            const repoUrl = document.getElementById("deploy-repo").value;
+            if (!repoUrl || !repoUrl.startsWith("http")) return;
+
+            const loader = document.getElementById("branch-loader");
+            const select = document.getElementById("deploy-branch");
+            
+            loader.classList.remove("hidden");
+            select.disabled = true;
+
+            try {
+                const res = await fetch(`/api/cicd/git/branches?repo_url=${encodeURIComponent(repoUrl)}`);
+                const data = await res.json();
+                
+                if (data.status === "success" && data.branches && data.branches.length > 0) {
+                    select.innerHTML = "";
+                    data.branches.forEach(branch => {
+                        const option = document.createElement("option");
+                        option.value = branch;
+                        option.textContent = branch;
+                        if (branch === "main" || branch === "master") option.selected = true;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (err) {
+                console.error("Error fetching branches:", err);
+            } finally {
+                loader.classList.add("hidden");
+                select.disabled = false;
+            }
+        }
+
         setInterval(refreshData, 4000);
         setInterval(checkActiveDeployments, 4000);
+        initDeploymentsForm();
     </script>
 </body>
 </html>

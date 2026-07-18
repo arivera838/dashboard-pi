@@ -95,3 +95,8 @@ class SaveClientAliasUseCase(ABC):
     @abstractmethod
     def execute(self, mac: str, alias: str) -> tuple[bool, str]:
         pass
+
+class GetGitBranchesUseCase(ABC):
+    @abstractmethod
+    def execute(self, repo_url: str) -> tuple[bool, list[str] | str]:
+        pass
