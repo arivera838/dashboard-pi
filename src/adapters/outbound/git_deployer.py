@@ -72,12 +72,28 @@ class SubprocessDeployer(DeployerPort):
 
         try:
             # 1. Asegurar ruta destino limpia
-            # Resolver la ruta de home del usuario real (evita usar /home/frivera o /root bajo sudo)
+            # Resolver la ruta de home del usuario real
+            import pwd
+            import glob
             sudo_user = os.environ.get("SUDO_USER")
             if sudo_user and sudo_user != "root":
                 home_dir = f"/home/{sudo_user}"
             else:
-                home_dir = os.path.expanduser("~")
+                try:
+                    # Intentar obtener el usuario dueño del script actual (evitar que sea root por systemd)
+                    stat_info = os.stat(__file__)
+                    user_info = pwd.getpwuid(stat_info.st_uid)
+                    if user_info.pw_name != "root":
+                        home_dir = user_info.pw_dir
+                    else:
+                        raise Exception("Owner is root")
+                except Exception:
+                    # Fallback robusto: buscar en /home/
+                    home_dirs = [d for d in glob.glob("/home/*") if os.path.isdir(d)]
+                    if home_dirs:
+                        home_dir = home_dirs[0]
+                    else:
+                        home_dir = os.path.expanduser("~")
                 
             base_path = os.path.join(home_dir, "apps", app_name)
             if target_dir:

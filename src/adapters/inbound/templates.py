@@ -1596,6 +1596,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         setInterval(refreshData, 4000);
         setInterval(checkActiveDeployments, 4000);
+        setInterval(refreshNetworkClients, 4000);
         initDeploymentsForm();
         loadGlobalAlertPreference();
     </script>
