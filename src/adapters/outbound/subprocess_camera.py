@@ -48,6 +48,8 @@ class SubprocessCameraAdapter(CameraPort):
     _video_writers: Dict[str, any] = {}
     _recording_start: Dict[str, float] = {}
     _recording_path: Dict[str, str] = {}
+    _video_writers = {}
+    _ffmpeg_processes = {}
     _recordings_dir = "./recordings"
     
     # Mapeo de índices de hardware
@@ -570,6 +572,31 @@ class SubprocessCameraAdapter(CameraPort):
                 self._recording_start[camera_id] = time.time()
                 self._recording_path[camera_id] = filepath
             return True, f"Grabación simulada iniciada para {camera_id}"
+            
+        if camera_id == "external_ip":
+            filename = f"recording_{camera_id}_{int(time.time())}.mp4"
+            filepath = os.path.join(self._recordings_dir, filename)
+            with self._lock:
+                if self._recording_active.get(camera_id, False):
+                    return False, "La cámara ya está siendo grabada actualmente"
+                try:
+                    import subprocess
+                    cmd = [
+                        "ffmpeg",
+                        "-f", "alsa", "-i", "default",
+                        "-i", "http://192.168.25.1:8080/?action=stream&w=1920&h=1080&fps=30",
+                        "-c:v", "mpeg4", "-q:v", "5",
+                        "-c:a", "aac",
+                        "-y", filepath
+                    ]
+                    process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    self._ffmpeg_processes[camera_id] = process
+                    self._recording_active[camera_id] = True
+                    self._recording_start[camera_id] = time.time()
+                    self._recording_path[camera_id] = filepath
+                    return True, f"Grabación (con audio) iniciada: {filename}"
+                except Exception as e:
+                    return False, f"Fallo al iniciar ffmpeg: {str(e)}"
 
         if not OPENCV_AVAILABLE:
             return False, "OpenCV no está disponible para realizar grabaciones de video reales"
@@ -610,13 +637,24 @@ class SubprocessCameraAdapter(CameraPort):
 
             self._recording_active[camera_id] = False
             
-            # Liberar VideoWriter
+            # Liberar VideoWriter o FFmpeg
             writer = self._video_writers.pop(camera_id, None)
             if writer:
                 try:
                     writer.release()
                 except Exception as e:
                     print(f"[Camera] Error liberando grabador: {e}")
+            
+            process = self._ffmpeg_processes.pop(camera_id, None)
+            if process:
+                try:
+                    process.terminate()
+                    process.wait(timeout=3)
+                except:
+                    try:
+                        process.kill()
+                    except:
+                        pass
 
             start_time = self._recording_start.pop(camera_id, 0.0)
             filepath = self._recording_path.get(camera_id, "")

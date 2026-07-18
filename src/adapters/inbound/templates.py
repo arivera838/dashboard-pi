@@ -584,6 +584,50 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </section>
 
     <!-- Script de lógica e interacción en el Frontend -->
+    <!-- Wi-Fi Scan Modal -->
+    <div id="wifi-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 w-full max-w-lg rounded-2xl shadow-2xl p-6 flex flex-col gap-6 relative">
+            <button onclick="closeWifiModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+            
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-wifi text-emerald-400"></i> Redes Disponibles
+            </h2>
+            
+            <div id="wifi-loader" class="flex flex-col items-center justify-center py-10 hidden">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-emerald-500 mb-4"></i>
+                <p class="text-gray-400 text-sm">Escaneando redes WiFi...</p>
+            </div>
+            
+            <div id="wifi-list" class="flex flex-col gap-2 max-h-60 overflow-y-auto hidden">
+                <!-- Redes inyectadas via JS -->
+            </div>
+            
+            <div id="wifi-connect-box" class="bg-gray-950 p-4 rounded-xl border border-gray-800 hidden flex flex-col gap-3 mt-2">
+                <p class="text-sm text-gray-300 font-medium">Conectar a <span id="wifi-selected-ssid" class="text-sky-400 font-bold"></span></p>
+                <input type="password" id="wifi-password" placeholder="Contraseña (opcional)" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                <div class="flex gap-2">
+                    <button onclick="cancelWifiConnect()" class="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition-colors">Cancelar</button>
+                    <button onclick="connectWifi()" class="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold transition-colors flex justify-center items-center gap-2">
+                        <i id="wifi-connecting-icon" class="fa-solid fa-circle-notch fa-spin hidden"></i> Conectar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Video Player Modal -->
+    <div id="video-modal" class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center p-4">
+        <div class="relative w-full max-w-4xl">
+            <button onclick="closeVideoModal()" class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors z-10">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            <video id="video-player" controls autoplay class="w-full rounded-lg shadow-2xl bg-black aspect-video border border-gray-800"></video>
+            <p id="video-title" class="text-center text-gray-400 mt-2 font-mono text-sm"></p>
+        </div>
+    </div>
+
     <script>
         let activeTab = "dashboard";
         let recordingStatusInterval = null;
@@ -1054,6 +1098,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <div class="flex justify-between items-center">
                             <span class="font-bold text-sm text-white">Cámara Externa (IP)</span>
                             <div class="flex gap-1.5 items-center">
+                                <span id="recording-badge-external_ip" class="hidden px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 uppercase animate-pulse flex items-center gap-1">
+                                    <span class="h-1.5 w-1.5 bg-red-500 rounded-full"></span> REC <span id="recording-timer-external_ip">00:00</span>
+                                </span>
                                 <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase">192.168.25.1</span>
                             </div>
                         </div>
@@ -1077,6 +1124,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <option value="15">15 FPS</option>
                                 <option value="5">5 FPS</option>
                             </select>
+                        </div>
+
+                        <!-- Botones de Acción Externa -->
+                        <div class="flex justify-between items-center pt-2 mt-1 border-t border-gray-800">
+                            <button onclick="openWifiModal()" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+                                <i class="fa-solid fa-wifi text-[10px] text-sky-400"></i> Buscar Cámaras IP
+                            </button>
+                            <button id="record-btn-external_ip" onclick="toggleRecording('external_ip')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+                                <i class="fa-solid fa-circle text-[8px] text-red-400 animate-pulse"></i> Iniciar Grabación
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1215,10 +1272,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <td class="py-3.5 px-4 font-bold text-gray-300 code-font flex items-center gap-2">
                             <i class="fa-solid fa-file-video text-indigo-400"></i> ${file}
                         </td>
-                        <td class="py-3.5 px-4 text-right">
+                        <td class="py-3.5 px-4 text-right flex justify-end gap-2">
+                            <button onclick="playVideo('${file}')" class="px-3 py-1.5 bg-emerald-600/15 hover:bg-emerald-600/30 border border-emerald-500/20 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5">
+                                <i class="fa-solid fa-play"></i> Reproducir
+                            </button>
                             <a href="/api/camera/recordings/download?file=${file}" class="px-3 py-1.5 bg-indigo-600/15 hover:bg-indigo-600/30 border border-indigo-500/20 text-indigo-300 hover:text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5">
                                 <i class="fa-solid fa-download"></i> Descargar
                             </a>
+                            <button onclick="deleteRecording('${file}')" class="px-3 py-1.5 bg-red-600/15 hover:bg-red-600/30 border border-red-500/20 text-red-400 hover:text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
                         </td>
                     </tr>
                 `).join('');

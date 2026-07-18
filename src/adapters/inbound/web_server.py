@@ -277,15 +277,25 @@ def create_handler_class(
                     self._send_json({"status": "error", "message": data}, 400)
                 return
 
-            elif url_parsed.path == "/api/camera/recordings/download":
+            elif url_parsed.path == "/api/camera/recordings/download" or url_parsed.path == "/api/camera/recordings/play":
+                query_params = parse_qs(url_parsed.query)
+                filename = query_params.get("file", [None])[0]
+                if not filename:
+                    self.send_error(400, "Falta el nombre del archivo")
+                    return
                 filepath = os.path.join("./recordings", filename)
                 if not os.path.exists(filepath):
                     self.send_error(404, "Archivo no encontrado")
                     return
                 
                 self.send_response(200)
-                self.send_header("Content-Type", "video/x-msvideo")
-                self.send_header("Content-Disposition", f"attachment; filename={filename}")
+                if url_parsed.path == "/api/camera/recordings/play":
+                    content_type = "video/mp4" if filename.endswith(".mp4") else "video/x-msvideo"
+                    self.send_header("Content-Type", content_type)
+                    self.send_header("Accept-Ranges", "bytes")
+                else:
+                    self.send_header("Content-Type", "video/x-msvideo")
+                    self.send_header("Content-Disposition", f"attachment; filename={filename}")
                 self.send_header("Content-Length", str(os.path.getsize(filepath)))
                 self.end_headers()
                 
@@ -336,6 +346,26 @@ def create_handler_class(
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(HTML_TEMPLATE.encode("utf-8"))
+                return
+
+            elif url_parsed.path == "/api/wifi/scan":
+                import subprocess
+                try:
+                    res = subprocess.run(["nmcli", "-t", "-f", "SSID,SIGNAL", "dev", "wifi", "list"], capture_output=True, text=True, timeout=10)
+                    networks = []
+                    seen = set()
+                    for line in res.stdout.split('\n'):
+                        if not line.strip(): continue
+                        parts = line.split(':')
+                        if len(parts) >= 2:
+                            ssid = parts[0]
+                            signal = parts[1]
+                            if ssid and ssid not in seen:
+                                seen.add(ssid)
+                                networks.append({"ssid": ssid, "signal": signal})
+                    self._send_json({"status": "success", "networks": networks})
+                except Exception as e:
+                    self._send_json({"status": "error", "message": f"Error escaneando WiFi: {str(e)}"}, 500)
                 return
 
             self.send_error(404, "Recurso no encontrado")
@@ -539,6 +569,31 @@ def create_handler_class(
 
             self._send_json(response_data)
 
+        def do_DELETE(self):
+            if not self.is_authenticated():
+                self._send_json({"status": "error", "message": "No autorizado"}, 401)
+                return
+            
+            url_parsed = urlparse(self.path)
+            if url_parsed.path == "/api/camera/recordings":
+                query_params = parse_qs(url_parsed.query)
+                filename = query_params.get("file", [None])[0]
+                if not filename:
+                    self._send_json({"status": "error", "message": "Falta el nombre del archivo"}, 400)
+                    return
+                filepath = os.path.join("./recordings", filename)
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                        self._send_json({"status": "success", "message": "Archivo eliminado"})
+                    except Exception as e:
+                        self._send_json({"status": "error", "message": str(e)}, 500)
+                else:
+                    self._send_json({"status": "error", "message": "Archivo no encontrado"}, 404)
+                return
+            
+            self.send_error(404, "Not Found")
+
     return DashboardRequestHandler
 
 
@@ -612,4 +667,4 @@ class WebServer:
             try:
                 httpd.serve_forever()
             except KeyboardInterrupt:
-                print("\nServidor detenido por el usuario.")
+                print("\nServidor detenido.")
