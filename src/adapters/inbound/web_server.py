@@ -167,6 +167,7 @@ def create_handler_class(
                         if not chunk:
                             break
                         self.wfile.write(chunk)
+                        time.sleep(0.001)
                 except Exception as e:
                     print(f"Error proxying external camera: {e}")
                 return
@@ -189,8 +190,8 @@ def create_handler_class(
                     while True:
                         frame_bytes, frame_idx = capture_frame_use_case.execute_packet(camera_id)
                         if frame_idx == last_frame_idx or not frame_bytes:
-                            # Espera mínima por un nuevo fotograma para liberar CPU
-                            time.sleep(0.005)
+                            # Espera para liberar CPU en la RPi
+                            time.sleep(0.033)
                             continue
                         
                         last_frame_idx = frame_idx
@@ -203,7 +204,7 @@ def create_handler_class(
                             self.wfile.write(b'Content-Type: image/jpeg\r\n\r\n')
                         self.wfile.write(frame_bytes)
                         self.wfile.write(b'\r\n')
-                        time.sleep(0.002)
+                        time.sleep(0.033)
                 except Exception as e:
                     # El cliente cerró la pestaña, detuvo la reproducción, o hubo un error de red
                     pass

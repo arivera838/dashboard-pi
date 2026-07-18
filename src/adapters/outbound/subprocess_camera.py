@@ -255,7 +255,7 @@ class SubprocessCameraAdapter(CameraPort):
                             print(f"[Camera] Error escribiendo frame al video: {write_err}")
                 
                 # Sleep mínimo para liberar el GIL y mantener fluidez máxima nativa sin sobrecalentar
-                time.sleep(0.005)
+                time.sleep(0.033)  # Limitar a ~30FPS (o 0.05 para ~20FPS)
             except Exception as e:
                 consecutive_errors += 1
                 if use_gstreamer and consecutive_errors >= 3:
