@@ -585,7 +585,7 @@ class SubprocessCameraAdapter(CameraPort):
                         "ffmpeg",
                         "-f", "alsa", "-i", "default",
                         "-i", "http://192.168.25.1:8080/?action=stream&w=1920&h=1080&fps=30",
-                        "-c:v", "mpeg4", "-q:v", "5",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                         "-c:a", "aac",
                         "-y", filepath
                     ]

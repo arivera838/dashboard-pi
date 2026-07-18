@@ -288,22 +288,56 @@ def create_handler_class(
                     self.send_error(404, "Archivo no encontrado")
                     return
                 
-                self.send_response(200)
-                if url_parsed.path == "/api/camera/recordings/play":
-                    content_type = "video/mp4" if filename.endswith(".mp4") else "video/x-msvideo"
-                    self.send_header("Content-Type", content_type)
-                    self.send_header("Accept-Ranges", "bytes")
-                else:
-                    self.send_header("Content-Type", "video/x-msvideo")
-                    self.send_header("Content-Disposition", f"attachment; filename={filename}")
-                self.send_header("Content-Length", str(os.path.getsize(filepath)))
-                self.end_headers()
+                file_size = os.path.getsize(filepath)
                 
-                try:
-                    with open(filepath, "rb") as f:
-                        self.wfile.write(f.read())
-                except Exception:
-                    pass
+                if url_parsed.path == "/api/camera/recordings/play":
+                    content_type = "video/mp4" if filename.endswith(".mp4") else "video/webm"
+                    
+                    range_header = self.headers.get('Range')
+                    if range_header:
+                        try:
+                            range_match = range_header.replace("bytes=", "").split("-")
+                            start = int(range_match[0])
+                            end = int(range_match[1]) if len(range_match) > 1 and range_match[1] else file_size - 1
+                            chunk_size = (end - start) + 1
+                            
+                            self.send_response(206)
+                            self.send_header("Content-Type", content_type)
+                            self.send_header("Accept-Ranges", "bytes")
+                            self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
+                            self.send_header("Content-Length", str(chunk_size))
+                            self.end_headers()
+                            
+                            with open(filepath, "rb") as f:
+                                f.seek(start)
+                                self.wfile.write(f.read(chunk_size))
+                        except Exception as e:
+                            self.send_error(400, "Invalid Range Header")
+                        return
+                    else:
+                        self.send_response(200)
+                        self.send_header("Content-Type", content_type)
+                        self.send_header("Accept-Ranges", "bytes")
+                        self.send_header("Content-Length", str(file_size))
+                        self.end_headers()
+                        try:
+                            with open(filepath, "rb") as f:
+                                self.wfile.write(f.read())
+                        except Exception:
+                            pass
+                        return
+                else:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "video/mp4")
+                    self.send_header("Content-Disposition", f"attachment; filename={filename}")
+                    self.send_header("Content-Length", str(file_size))
+                    self.end_headers()
+                    try:
+                        with open(filepath, "rb") as f:
+                            self.wfile.write(f.read())
+                    except Exception:
+                        pass
+                    return
             # 1.39 API: Obtener configuración de CI/CD
             elif url_parsed.path == "/api/cicd/config":
                 from src.adapters.outbound.cicd_config import get_cicd_config
