@@ -1020,7 +1020,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     return;
                 }
 
-                grid.innerHTML = cameras.map(cam => `
+                const internalCamerasHTML = cameras.map(cam => `
                     <div class="bg-gray-950 border border-gray-800 rounded-xl overflow-hidden p-4 flex flex-col gap-3">
                         <div class="flex justify-between items-center">
                             <span class="font-bold text-sm text-white">${cam.name}</span>
@@ -1049,9 +1049,57 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 `).join('');
 
+                const externalCameraHTML = `
+                    <div class="bg-gray-950 border border-gray-800 rounded-xl overflow-hidden p-4 flex flex-col gap-3">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-sm text-white">Cámara Externa (IP)</span>
+                            <div class="flex gap-1.5 items-center">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase">192.168.25.1</span>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-900 border border-gray-800/50 rounded-lg aspect-video flex items-center justify-center overflow-hidden relative">
+                            <img id="external-cam-stream" class="w-full h-full object-cover" src="http://192.168.25.1:8080/?action=stream&w=1920&h=1080&fps=30" alt="External Stream" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\'><rect width=\'100%\' height=\'100%\' fill=\'%23111827\'/><text x=\'50%\' y=\'50%\' font-family=\'sans-serif\' font-size=\'14\' fill=\'%23ef4444\' text-anchor=\'middle\'>Conexión Perdida</text></svg>';">
+                            <div class="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[9px] text-gray-300 code-font flex items-center gap-1">
+                                <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
+                            </div>
+                        </div>
+                        
+                        <!-- Controles de Calidad -->
+                        <div class="flex items-center gap-3 pt-1">
+                            <select id="external-cam-res" onchange="updateExternalCamera()" class="bg-gray-900 border border-gray-800 text-xs text-white rounded-lg px-2 py-2 focus:outline-none focus:border-emerald-500 cursor-pointer">
+                                <option value="1920x1080">1920x1080 (FHD)</option>
+                                <option value="1280x720">1280x720 (HD)</option>
+                                <option value="640x480">640x480 (VGA)</option>
+                            </select>
+                            <select id="external-cam-fps" onchange="updateExternalCamera()" class="bg-gray-900 border border-gray-800 text-xs text-white rounded-lg px-2 py-2 focus:outline-none focus:border-emerald-500 cursor-pointer">
+                                <option value="30">30 FPS</option>
+                                <option value="15">15 FPS</option>
+                                <option value="5">5 FPS</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+
+                grid.innerHTML = internalCamerasHTML + externalCameraHTML;
+
                 pollRecordingsStatus();
             } catch (err) {
                 console.error("Error cargando cámaras:", err);
+            }
+        }
+
+        // --- MÉTODOS DE CÁMARA EXTERNA ---
+        function updateExternalCamera() {
+            const res = document.getElementById("external-cam-res").value.split("x");
+            const fps = document.getElementById("external-cam-fps").value;
+            const img = document.getElementById("external-cam-stream");
+            
+            if (img) {
+                // Se genera un timestamp o random query param extra para forzar el recargo de MJPEG
+                const cacheBuster = new Date().getTime();
+                img.src = `http://192.168.25.1:8080/?action=stream&w=${res[0]}&h=${res[1]}&fps=${fps}&_t=${cacheBuster}`;
+                showToast("Ajustes Actualizados", `Cámara configurada a ${res[0]}x${res[1]} @ ${fps} FPS`);
             }
         }
 
