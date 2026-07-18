@@ -1059,7 +1059,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                         
                         <div class="bg-gray-900 border border-gray-800/50 rounded-lg aspect-video flex items-center justify-center overflow-hidden relative">
-                            <img id="external-cam-stream" class="w-full h-full object-cover" src="http://192.168.25.1:8080/?action=stream&w=1920&h=1080&fps=30" alt="External Stream" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\'><rect width=\'100%\' height=\'100%\' fill=\'%23111827\'/><text x=\'50%\' y=\'50%\' font-family=\'sans-serif\' font-size=\'14\' fill=\'%23ef4444\' text-anchor=\'middle\'>Conexión Perdida</text></svg>';">
+                            <img id="external-cam-stream" class="w-full h-full object-cover" src="/api/camera/external_stream?w=1920&h=1080&fps=30" alt="External Stream" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'100%\'><rect width=\'100%\' height=\'100%\' fill=\'%23111827\'/><text x=\'50%\' y=\'50%\' font-family=\'sans-serif\' font-size=\'14\' fill=\'%23ef4444\' text-anchor=\'middle\'>Conexión Perdida</text></svg>';">
                             <div class="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[9px] text-gray-300 code-font flex items-center gap-1">
                                 <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
                             </div>
@@ -1098,7 +1098,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (img) {
                 // Se genera un timestamp o random query param extra para forzar el recargo de MJPEG
                 const cacheBuster = new Date().getTime();
-                img.src = `http://192.168.25.1:8080/?action=stream&w=${res[0]}&h=${res[1]}&fps=${fps}&_t=${cacheBuster}`;
+                img.src = `/api/camera/external_stream?w=${res[0]}&h=${res[1]}&fps=${fps}&_t=${cacheBuster}`;
                 showToast("Ajustes Actualizados", `Cámara configurada a ${res[0]}x${res[1]} @ ${fps} FPS`);
             }
         }

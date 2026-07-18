@@ -143,6 +143,34 @@ def create_handler_class(
                     self.send_error(400, "Falta el ID de la camara")
                 return
 
+            # 1.34b API: Proxy para cámara MJPEG externa
+            elif url_parsed.path == "/api/camera/external_stream":
+                query_params = parse_qs(url_parsed.query)
+                w = query_params.get("w", ["1920"])[0]
+                h = query_params.get("h", ["1080"])[0]
+                fps = query_params.get("fps", ["30"])[0]
+                
+                target_url = f"http://192.168.25.1:8080/?action=stream&w={w}&h={h}&fps={fps}"
+                try:
+                    import urllib.request
+                    req = urllib.request.urlopen(target_url, timeout=5)
+                    self.send_response(200)
+                    content_type = req.getheader('Content-Type')
+                    if content_type:
+                        self.send_header('Content-Type', content_type)
+                    else:
+                        self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=boundarydonotcross')
+                    self.end_headers()
+                    
+                    while True:
+                        chunk = req.read(8192)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                except Exception as e:
+                    print(f"Error proxying external camera: {e}")
+                return
+
             # 1.35 API: Streaming MJPEG fluido de cámara (Transmisión continua)
             elif url_parsed.path == "/api/camera/stream":
                 query_params = parse_qs(url_parsed.query)
