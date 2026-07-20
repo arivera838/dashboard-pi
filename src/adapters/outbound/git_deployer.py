@@ -137,13 +137,35 @@ class SubprocessDeployer(DeployerPort):
             if os.path.exists(compose_file):
                 self._active_logs[app_name]["log"] += "\n🐳 [Docker] Detectado docker-compose.yml, construyendo e iniciando contenedores en segundo plano...\n"
                 
-                # Generar override de Traefik dinámicamente
+                # Generar override de Traefik dinámicamente detectando el primer servicio
+                service_name = "app"
+                try:
+                    with open(compose_file, "r") as f:
+                        in_services = False
+                        for line in f:
+                            stripped = line.rstrip()
+                            if not stripped or stripped.startswith("#"):
+                                continue
+                            if stripped.startswith("services:"):
+                                in_services = True
+                                continue
+                            if in_services:
+                                if line[0].isalnum() and not stripped.startswith("services:"):
+                                    break
+                                if (line.startswith(" ") or line.startswith("\t")) and stripped.endswith(":"):
+                                    cand = stripped.strip()[:-1]
+                                    if cand not in ["build", "image", "ports", "environment", "volumes", "networks", "restart", "depends_on", "command"]:
+                                        service_name = cand
+                                        break
+                except Exception as e:
+                    self._active_logs[app_name]["log"] += f"⚠️ [Docker] Error detectando servicio en docker-compose: {e}. Usando 'app' por defecto.\n"
+
                 subdomain = f"{app_name}.local" if branch == "main" else f"{branch}.{app_name}.local"
                 project_name = f"{app_name}-{branch}"
                 
                 override_content = f"""
 services:
-  app:
+  {service_name}:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.{project_name}.rule=Host(`{subdomain}`)"
@@ -159,7 +181,7 @@ networks:
                 try:
                     with open(override_path, "w") as f:
                         f.write(override_content)
-                    self._active_logs[app_name]["log"] += f"📝 [Traefik] Generado docker-compose.override.yml para dominio: {subdomain}\n"
+                    self._active_logs[app_name]["log"] += f"📝 [Traefik] Generado docker-compose.override.yml para servicio '{service_name}' y dominio: {subdomain}\n"
                     # Asegurar red web
                     subprocess.run(["docker", "network", "create", "web"], capture_output=True)
                 except Exception as e:
