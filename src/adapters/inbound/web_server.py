@@ -248,6 +248,25 @@ def create_handler_class(
                 self.end_headers()
                 self.wfile.write(json.dumps(settings).encode("utf-8"))
                 return
+            # 1.376 API: Obtener información de cámara externa (IP, SSID)
+            elif url_parsed.path == "/api/camera/external/info":
+                import subprocess
+                ssid = "Desconocida"
+                ip = "192.168.25.1"
+                try:
+                    res = subprocess.run(["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"], capture_output=True, text=True, timeout=5)
+                    for line in res.stdout.split('\n'):
+                        if line.startswith('yes:'):
+                            ssid = line.split(':')[1]
+                            break
+                except:
+                    pass
+                
+                if get_external_camera_ip_use_case:
+                    ip = get_external_camera_ip_use_case.execute()
+                    
+                self._send_json({"ip": ip, "ssid": ssid})
+                return
 
             # 1.38 API: Descargar archivo de video
             elif url_parsed.path == "/api/camera/recordings/download":

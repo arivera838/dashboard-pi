@@ -1166,6 +1166,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 `).join('');
 
+                const resInfo = await fetch("/api/camera/external/info").catch(() => null);
+                let extIp = "IP EXTERNA";
+                let extSsid = "";
+                if (resInfo && resInfo.ok) {
+                    const info = await resInfo.json();
+                    if (info.ip) extIp = info.ip;
+                    if (info.ssid && info.ssid !== "Desconocida") extSsid = info.ssid;
+                }
+
+                const ssidBadge = extSsid ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase max-w-[100px] truncate" title="${extSsid}"><i class="fa-solid fa-wifi mr-1"></i>${extSsid}</span>` : '';
+
                 const externalCameraHTML = `
                     <div class="bg-gray-950 border border-gray-800 rounded-xl overflow-hidden p-4 flex flex-col gap-3">
                         <div class="flex justify-between items-center">
@@ -1174,7 +1185,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <span id="recording-badge-external_ip" class="hidden px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 uppercase animate-pulse flex items-center gap-1">
                                     <span class="h-1.5 w-1.5 bg-red-500 rounded-full"></span> REC <span id="recording-timer-external_ip">00:00</span>
                                 </span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase">IP EXTERNA</span>
+                                ${ssidBadge}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase">${extIp}</span>
                             </div>
                         </div>
                         
@@ -1844,6 +1856,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (data.status === 'success') {
                     showToast("WiFi", `Conectado a ${ssid} exitosamente`, "success");
                     closeWifiModal();
+                    loadCameraList();
                 } else {
                     showToast("WiFi Error", data.message, "error");
                 }
