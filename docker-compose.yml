@@ -32,6 +32,6 @@ services:
       # COMPARTIR ARCHIVOS IPA DE CALIBRACIÓN DE LA CÁMARA (Esencial para que libcamera funcione en Docker)
       - /usr/share/libcamera:/usr/share/libcamera:ro
       # Carpeta donde se clonarán y desplegarán las apps en el host
-      - ./apps:/root/apps
+      - ~/apps:/root/apps
     environment:
       - PYTHONUNBUFFERED=1

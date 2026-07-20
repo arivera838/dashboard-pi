@@ -182,7 +182,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                             <div class="flex justify-between text-xs py-2">
                                 <span class="text-gray-400">Ruta de despliegues</span>
-                                <span class="code-font text-gray-200">/root/apps/</span>
+                                <span class="code-font text-gray-200">~/apps/</span>
                             </div>
                         </div>
                     </div>

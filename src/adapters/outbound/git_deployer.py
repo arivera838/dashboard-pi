@@ -187,6 +187,15 @@ networks:
                     self._active_logs[app_name]["log"] += "\n❌ [ERROR] Falló la compilación o levantamiento con Docker Compose.\n"
                     return
                 
+                # Obtener los logs iniciales de los contenedores recién levantados
+                self._active_logs[app_name]["log"] += "\n📄 [Docker] Obteniendo logs iniciales de los contenedores recién iniciados (últimas 100 líneas)...\n"
+                logs_cmd = f"cd {base_path} && docker compose -p {project_name} logs --no-color --tail=100"
+                logs_res = subprocess.run(logs_cmd, shell=True, capture_output=True, text=True)
+                if logs_res.stdout:
+                    self._active_logs[app_name]["log"] += logs_res.stdout + "\n"
+                if logs_res.stderr:
+                    self._active_logs[app_name]["log"] += logs_res.stderr + "\n"
+
                 self._active_logs[app_name]["log"] += "\n🚀 [CI/CD] ¡Despliegue completado con éxito! Los servicios de Docker están corriendo.\n"
             else:
                 self._active_logs[app_name]["log"] += "\n⚠️ [Advertencia] No se encontró un archivo docker-compose.yml. Repositorio descargado, pero no se inició ningún contenedor.\n"
