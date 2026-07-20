@@ -33,7 +33,8 @@ from src.application.services import (
     SetExternalCameraIpService,
     SaveClientAliasService,
     CancelDeploymentService,
-    GetGitBranchesService
+    GetGitBranchesService,
+    GetLocalAppsService
 )
 from src.adapters.inbound.web_server import WebServer
 
