@@ -601,6 +601,28 @@ def create_handler_class(
                     response_data = {"status": "success" if success else "error", "message": msg}
                 else:
                     response_data = {"status": "error", "message": "Faltan parametros mac o alias"}
+                    
+            # 8. API POST: Conectar a red WiFi
+            elif url_parsed.path == "/api/wifi/connect":
+                ssid = params.get("ssid")
+                password = params.get("password", "")
+                if not ssid:
+                    response_data = {"status": "error", "message": "El parámetro ssid es requerido."}
+                else:
+                    import subprocess
+                    try:
+                        if password:
+                            cmd = ["nmcli", "dev", "wifi", "connect", ssid, "password", password]
+                        else:
+                            cmd = ["nmcli", "dev", "wifi", "connect", ssid]
+                        
+                        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                        if res.returncode == 0:
+                            response_data = {"status": "success", "message": f"Conectado a {ssid}"}
+                        else:
+                            response_data = {"status": "error", "message": f"Error conectando: {res.stderr or res.stdout}"}
+                    except Exception as e:
+                        response_data = {"status": "error", "message": str(e)}
 
             self._send_json(response_data)
 
