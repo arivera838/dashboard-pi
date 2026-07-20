@@ -706,7 +706,10 @@ class WebServer:
         update_vision_settings_use_case: UpdateVisionSettingsUseCase,
         save_client_alias_use_case: SaveClientAliasUseCase,
         webhook_use_case=None,
-        get_git_branches_use_case=None
+        get_git_branches_use_case=None,
+        get_local_apps_use_case=None,
+        get_external_camera_ip_use_case=None,
+        set_external_camera_ip_use_case=None
     ):
         self.port = port
         self.handler_class = create_handler_class(
@@ -729,7 +732,10 @@ class WebServer:
             update_vision_settings_use_case,
             save_client_alias_use_case,
             webhook_use_case,
-            get_git_branches_use_case
+            get_git_branches_use_case,
+            get_local_apps_use_case,
+            get_external_camera_ip_use_case,
+            set_external_camera_ip_use_case
         )
 
     def start(self):
