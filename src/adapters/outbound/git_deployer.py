@@ -62,6 +62,72 @@ class SubprocessDeployer(DeployerPort):
                 return False, f"Error al cancelar: {e}"
         return False, "No hay ningún despliegue activo para esta aplicación."
 
+    def _get_apps_dir(self) -> str:
+        import pwd
+        import glob
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user and sudo_user != "root":
+            home_dir = f"/home/{sudo_user}"
+        else:
+            try:
+                # Intentar obtener el usuario dueño del script actual (evitar que sea root por systemd)
+                stat_info = os.stat(__file__)
+                user_info = pwd.getpwuid(stat_info.st_uid)
+                if user_info.pw_name != "root":
+                    home_dir = user_info.pw_dir
+                else:
+                    raise Exception("Owner is root")
+            except Exception:
+                # Fallback robusto: buscar en /home/
+                home_dirs = [d for d in glob.glob("/home/*") if os.path.isdir(d)]
+                if home_dirs:
+                    home_dir = home_dirs[0]
+                else:
+                    home_dir = os.path.expanduser("~")
+        return os.path.join(home_dir, "apps")
+
+    def get_local_apps(self) -> list:
+        apps_dir = self._get_apps_dir()
+        if not os.path.exists(apps_dir):
+            return []
+        
+        apps = []
+        for app_name in os.listdir(apps_dir):
+            app_path = os.path.join(apps_dir, app_name)
+            git_path = os.path.join(app_path, ".git")
+            if os.path.isdir(app_path) and os.path.isdir(git_path):
+                # Extraer URL
+                try:
+                    res_url = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=app_path, capture_output=True, text=True)
+                    repo_url = res_url.stdout.strip()
+                except Exception:
+                    repo_url = ""
+                # Extraer rama actual
+                try:
+                    res_branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=app_path, capture_output=True, text=True)
+                    current_branch = res_branch.stdout.strip()
+                except Exception:
+                    current_branch = ""
+                # Extraer ramas disponibles locales o remotas
+                try:
+                    res_all_branches = subprocess.run(["git", "branch", "-r"], cwd=app_path, capture_output=True, text=True)
+                    branches = []
+                    for line in res_all_branches.stdout.split("\n"):
+                        clean_branch = line.replace("origin/HEAD -> ", "").replace("origin/", "").strip()
+                        if clean_branch and clean_branch not in branches:
+                            branches.append(clean_branch)
+                except Exception:
+                    branches = []
+                
+                if repo_url:
+                    apps.append({
+                        "app_name": app_name,
+                        "repo_url": repo_url,
+                        "current_branch": current_branch,
+                        "available_branches": branches
+                    })
+        return apps
+
     def _run_deploy_thread(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main"):
         self._active_logs[app_name] = {
             "status": "running",
@@ -72,30 +138,8 @@ class SubprocessDeployer(DeployerPort):
 
         try:
             # 1. Asegurar ruta destino limpia
-            # Resolver la ruta de home del usuario real
-            import pwd
-            import glob
-            sudo_user = os.environ.get("SUDO_USER")
-            if sudo_user and sudo_user != "root":
-                home_dir = f"/home/{sudo_user}"
-            else:
-                try:
-                    # Intentar obtener el usuario dueño del script actual (evitar que sea root por systemd)
-                    stat_info = os.stat(__file__)
-                    user_info = pwd.getpwuid(stat_info.st_uid)
-                    if user_info.pw_name != "root":
-                        home_dir = user_info.pw_dir
-                    else:
-                        raise Exception("Owner is root")
-                except Exception:
-                    # Fallback robusto: buscar en /home/
-                    home_dirs = [d for d in glob.glob("/home/*") if os.path.isdir(d)]
-                    if home_dirs:
-                        home_dir = home_dirs[0]
-                    else:
-                        home_dir = os.path.expanduser("~")
-                
-            base_path = os.path.join(home_dir, "apps", app_name)
+            apps_dir = self._get_apps_dir()
+            base_path = os.path.join(apps_dir, app_name)
             if target_dir:
                 base_path = os.path.abspath(target_dir)
 

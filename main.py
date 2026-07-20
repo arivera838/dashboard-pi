@@ -29,6 +29,8 @@ from src.application.services import (
     ListRecordingsService,
     GetVisionSettingsService,
     UpdateVisionSettingsService,
+    GetExternalCameraIpService,
+    SetExternalCameraIpService,
     SaveClientAliasService,
     CancelDeploymentService,
     GetGitBranchesService
@@ -64,6 +66,8 @@ def main():
     list_recordings_service = ListRecordingsService(camera_adapter)
     get_vision_settings_service = GetVisionSettingsService(camera_adapter)
     update_vision_settings_service = UpdateVisionSettingsService(camera_adapter)
+    get_external_camera_ip_service = GetExternalCameraIpService(camera_adapter)
+    set_external_camera_ip_service = SetExternalCameraIpService(camera_adapter)
     save_client_alias_service = SaveClientAliasService(network_adapter)
 
     # CI/CD Services
@@ -78,6 +82,8 @@ def main():
 
     cancel_deploy_service = CancelDeploymentService(deployer)
     get_git_branches_service = GetGitBranchesService()
+
+    get_local_apps_service = GetLocalAppsService(deployer)
 
     # 3. Instanciar y arrancar adaptador de entrada (servidor web) inyectando los casos de uso
     server = WebServer(
@@ -101,7 +107,10 @@ def main():
         update_vision_settings_use_case=update_vision_settings_service,
         save_client_alias_use_case=save_client_alias_service,
         webhook_use_case=webhook_use_case,
-        get_git_branches_use_case=get_git_branches_service
+        get_git_branches_use_case=get_git_branches_service,
+        get_local_apps_use_case=get_local_apps_service,
+        get_external_camera_ip_use_case=get_external_camera_ip_service,
+        set_external_camera_ip_use_case=set_external_camera_ip_service
     )
 
     server.start()

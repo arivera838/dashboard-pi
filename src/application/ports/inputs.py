@@ -42,6 +42,11 @@ class ListDeploymentsUseCase(ABC):
     def execute(self) -> dict:
         pass
 
+class GetLocalAppsUseCase(ABC):
+    @abstractmethod
+    def execute(self) -> list:
+        pass
+
 class GetCamerasUseCase(ABC):
     @abstractmethod
     def execute(self) -> List[CameraInfo]:
@@ -89,6 +94,16 @@ class GetVisionSettingsUseCase(ABC):
 class UpdateVisionSettingsUseCase(ABC):
     @abstractmethod
     def execute(self, face_enabled: bool, hand_enabled: bool) -> tuple[bool, str]:
+        pass
+
+class GetExternalCameraIpUseCase(ABC):
+    @abstractmethod
+    def execute(self) -> str:
+        pass
+
+class SetExternalCameraIpUseCase(ABC):
+    @abstractmethod
+    def execute(self, ip: str) -> None:
         pass
 
 class SaveClientAliasUseCase(ABC):

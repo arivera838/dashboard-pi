@@ -50,7 +50,10 @@ def create_handler_class(
     update_vision_settings_use_case: UpdateVisionSettingsUseCase,
     save_client_alias_use_case: SaveClientAliasUseCase,
     webhook_use_case=None,
-    get_git_branches_use_case=None
+    get_git_branches_use_case=None,
+    get_local_apps_use_case=None,
+    get_external_camera_ip_use_case=None,
+    set_external_camera_ip_use_case=None
 ):
     class DashboardRequestHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -150,7 +153,11 @@ def create_handler_class(
                 h = query_params.get("h", ["1080"])[0]
                 fps = query_params.get("fps", ["30"])[0]
                 
-                target_url = f"http://192.168.25.1:8080/?action=stream&w={w}&h={h}&fps={fps}"
+                ext_ip = "192.168.25.1"
+                if get_external_camera_ip_use_case:
+                    ext_ip = get_external_camera_ip_use_case.execute()
+                
+                target_url = f"http://{ext_ip}:8080/?action=stream&w={w}&h={h}&fps={fps}"
                 try:
                     import urllib.request
                     req = urllib.request.urlopen(target_url, timeout=5)
@@ -276,6 +283,14 @@ def create_handler_class(
                     self._send_json({"status": "success", "branches": data})
                 else:
                     self._send_json({"status": "error", "message": data}, 400)
+                return
+
+            elif url_parsed.path == "/api/deployments/apps":
+                if get_local_apps_use_case:
+                    apps = get_local_apps_use_case.execute()
+                    self._send_json({"status": "success", "apps": apps})
+                else:
+                    self._send_json({"status": "error", "message": "Caso de uso no inyectado"}, 500)
                 return
 
             elif url_parsed.path == "/api/camera/recordings/download" or url_parsed.path == "/api/camera/recordings/play":
@@ -618,6 +633,20 @@ def create_handler_class(
                         
                         res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                         if res.returncode == 0:
+                            if set_external_camera_ip_use_case:
+                                try:
+                                    # Obtener la IP del gateway de la red recién conectada (cámara IP)
+                                    route_res = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True)
+                                    for line in route_res.stdout.split('\\n'):
+                                        if 'wlan0' in line and 'default via' in line:
+                                            parts = line.split()
+                                            if len(parts) >= 3:
+                                                ip = parts[2]
+                                                set_external_camera_ip_use_case.execute(ip)
+                                                break
+                                except Exception as e:
+                                    print(f"Error obteniendo gateway de wlan0: {e}")
+                                    
                             response_data = {"status": "success", "message": f"Conectado a {ssid}"}
                         else:
                             response_data = {"status": "error", "message": f"Error conectando: {res.stderr or res.stdout}"}

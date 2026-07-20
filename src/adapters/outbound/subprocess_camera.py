@@ -59,6 +59,9 @@ class SubprocessCameraAdapter(CameraPort):
     _face_detection_enabled = False
     _hand_detection_enabled = False
     
+    # IP Externa Dinámica
+    _external_camera_ip = "192.168.25.1"
+    
     # Clasificadores e inicialización de modelos
     _face_cascade = None
     _mp_hands = None
@@ -101,6 +104,15 @@ class SubprocessCameraAdapter(CameraPort):
                 "hand_enabled": self._hand_detection_enabled,
                 "mediapipe_installed": MEDIAPIPE_AVAILABLE
             }
+
+    def set_external_camera_ip(self, ip: str) -> None:
+        with self._lock:
+            self._external_camera_ip = ip
+            print(f"[Camera] IP de cámara externa actualizada a {ip}")
+
+    def get_external_camera_ip(self) -> str:
+        with self._lock:
+            return self._external_camera_ip
 
     def _scan_hardware_cameras(self) -> List[dict]:
         detected = []
@@ -584,7 +596,7 @@ class SubprocessCameraAdapter(CameraPort):
                     cmd = [
                         "ffmpeg",
                         "-f", "alsa", "-i", "default",
-                        "-i", "http://192.168.25.1:8080/?action=stream&w=1920&h=1080&fps=30",
+                        "-i", f"http://{self._external_camera_ip}:8080/?action=stream&w=1920&h=1080&fps=30",
                         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                         "-c:a", "aac",
                         "-y", filepath

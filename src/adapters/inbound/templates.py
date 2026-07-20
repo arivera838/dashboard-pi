@@ -218,6 +218,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </p>
 
                         <form id="cicd-form" onsubmit="handleDeploy(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-400 mb-1">Seleccionar App Existente (Autocompletar)</label>
+                                <select id="local-apps-select" onchange="autofillLocalApp()" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="">-- Selecciona una aplicación instalada --</option>
+                                </select>
+                            </div>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1">Nombre de la Aplicación</label>
@@ -883,7 +889,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <div class="font-bold text-gray-200 code-font">${c.name}</div>
                         <div class="text-[10px] text-gray-500 code-font">${c.id}</div>
                     </td>
-                    <td class="py-3.5 px-4 text-xs code-font text-gray-400">${c.image}</td>
+                    <td class="py-3.5 px-4 text-xs code-font text-gray-400">
+                        ${c.image}
+                        ${c.is_managed_app ? `<div class="mt-1"><span class="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full text-[10px] border border-indigo-500/30"><i class="fa-solid fa-code-branch mr-1"></i>${c.git_branch}</span></div>` : ''}
+                    </td>
                     <td class="py-3.5 px-4 text-xs code-font text-gray-400">${c.ports || '—'}</td>
                     <td class="py-3.5 px-4 text-xs code-font text-emerald-400">${c.memory_usage || 'N/A'}</td>
                     <td class="py-3.5 px-4">
@@ -894,6 +903,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </td>
                     <td class="py-3.5 px-4 text-right">
                         <div class="flex justify-end gap-1.5">
+                            ${c.is_managed_app ? `
+                                <button onclick="redeployContainer('${c.name}')" class="p-1.5 bg-gray-800 hover:bg-indigo-500/15 text-indigo-400 rounded-lg text-xs transition-colors" title="Redesplegar (Pull)">
+                                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                                </button>
+                            ` : ''}
                             ${c.running ? `
                                 <button onclick="controlDocker('${c.id}', 'stop')" class="p-1.5 bg-gray-800 hover:bg-red-500/15 text-gray-400 hover:text-red-400 rounded-lg text-xs transition-colors" title="Detener">
                                     <i class="fa-solid fa-stop"></i>
@@ -916,6 +930,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </td>
                 </tr>
             `).join('');
+        }
+
+        function redeployContainer(appName) {
+            switchTab('cicd');
+            const select = document.getElementById("local-apps-select");
+            if (select) {
+                select.value = appName;
+                autofillLocalApp();
+                showToast("Info", "Selecciona la rama y haz clic en Iniciar Despliegue para hacer pull y actualizar el contenedor.", "success");
+            }
         }
 
         // Acciones Docker
@@ -1022,6 +1046,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        let localAppsCache = [];
+        
+        async function fetchLocalApps() {
+            try {
+                const res = await fetch("/api/deployments/apps");
+                const result = await res.json();
+                if (result.status === "success" && result.apps) {
+                    localAppsCache = result.apps;
+                    const select = document.getElementById("local-apps-select");
+                    if (!select) return;
+                    select.innerHTML = '<option value="">-- Selecciona una aplicación instalada --</option>';
+                    result.apps.forEach(app => {
+                        const opt = document.createElement("option");
+                        opt.value = app.app_name;
+                        opt.textContent = `${app.app_name} (${app.current_branch})`;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.warn("Error fetching local apps:", err);
+            }
+        }
+        
+        function autofillLocalApp() {
+            const select = document.getElementById("local-apps-select");
+            const appName = select.value;
+            if (!appName) return;
+            
+            const app = localAppsCache.find(a => a.app_name === appName);
+            if (app) {
+                document.getElementById("deploy-name").value = app.app_name;
+                document.getElementById("deploy-repo").value = app.repo_url;
+                
+                const branchSelect = document.getElementById("deploy-branch");
+                branchSelect.innerHTML = "";
+                if (app.available_branches && app.available_branches.length > 0) {
+                    app.available_branches.forEach(b => {
+                        const opt = document.createElement("option");
+                        opt.value = b;
+                        opt.textContent = b;
+                        if (b === app.current_branch) opt.selected = true;
+                        branchSelect.appendChild(opt);
+                    });
+                } else if (app.current_branch) {
+                    branchSelect.innerHTML = `<option value="${app.current_branch}">${app.current_branch}</option>`;
+                }
+            }
+        }
+
         async function cancelActiveDeploy() {
             if (!activeDeployApp) {
                 showToast("Atención", "No hay despliegue activo para cancelar en esta pestaña.", "error");
@@ -1101,7 +1174,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <span id="recording-badge-external_ip" class="hidden px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 uppercase animate-pulse flex items-center gap-1">
                                     <span class="h-1.5 w-1.5 bg-red-500 rounded-full"></span> REC <span id="recording-timer-external_ip">00:00</span>
                                 </span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase">192.168.25.1</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase">IP EXTERNA</span>
                             </div>
                         </div>
                         
@@ -1816,6 +1889,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         setInterval(refreshNetworkClients, 4000);
         initDeploymentsForm();
         loadGlobalAlertPreference();
+        fetchLocalApps();
     </script>
 </body>
 </html>

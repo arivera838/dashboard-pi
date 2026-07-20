@@ -45,6 +45,9 @@ class DockerContainer:
     running: bool
     ports: str
     memory_usage: str = "N/A"
+    git_branch: str = None
+    git_url: str = None
+    is_managed_app: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -54,7 +57,10 @@ class DockerContainer:
             "image": self.image,
             "running": self.running,
             "ports": self.ports,
-            "memory_usage": self.memory_usage
+            "memory_usage": self.memory_usage,
+            "git_branch": self.git_branch,
+            "git_url": self.git_url,
+            "is_managed_app": self.is_managed_app
         }
 
 @dataclass(frozen=True)

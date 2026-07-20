@@ -50,6 +50,10 @@ class DeployerPort(ABC):
     def cancel_deploy(self, app_name: str) -> tuple[bool, str]:
         pass
 
+    @abstractmethod
+    def get_local_apps(self) -> list:
+        pass
+
 class CameraPort(ABC):
     @abstractmethod
     def list_cameras(self) -> List[CameraInfo]:
@@ -85,6 +89,14 @@ class CameraPort(ABC):
 
     @abstractmethod
     def get_vision_settings(self) -> dict:
+        pass
+
+    @abstractmethod
+    def set_external_camera_ip(self, ip: str) -> None:
+        pass
+
+    @abstractmethod
+    def get_external_camera_ip(self) -> str:
         pass
 
 class NetworkPort(ABC):

@@ -17,6 +17,8 @@ from src.application.ports.inputs import (
     ListRecordingsUseCase,
     GetVisionSettingsUseCase,
     UpdateVisionSettingsUseCase,
+    GetExternalCameraIpUseCase,
+    SetExternalCameraIpUseCase,
     SaveClientAliasUseCase,
     CancelDeploymentUseCase,
     GetGitBranchesUseCase
@@ -121,6 +123,12 @@ class ListDeploymentsService(ListDeploymentsUseCase):
             print(f"[ListDeploymentsService] Error al escanear proyectos compose: {e}")
             
         return deployments
+class GetLocalAppsService(GetLocalAppsUseCase):
+    def __init__(self, deployer: DeployerPort):
+        self._deployer = deployer
+
+    def execute(self) -> list:
+        return self._deployer.get_local_apps()
 
 class GetCamerasService(GetCamerasUseCase):
     def __init__(self, camera_port: CameraPort):
@@ -188,6 +196,20 @@ class UpdateVisionSettingsService(UpdateVisionSettingsUseCase):
     def execute(self, face_enabled: bool, hand_enabled: bool) -> tuple[bool, str]:
         self._camera_port.set_vision_settings(face_enabled, hand_enabled)
         return True, "Ajustes de visión artificial actualizados"
+
+class GetExternalCameraIpService(GetExternalCameraIpUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self) -> str:
+        return self._camera_port.get_external_camera_ip()
+
+class SetExternalCameraIpService(SetExternalCameraIpUseCase):
+    def __init__(self, camera_port: CameraPort):
+        self._camera_port = camera_port
+
+    def execute(self, ip: str) -> None:
+        self._camera_port.set_external_camera_ip(ip)
 
 class SaveClientAliasService(SaveClientAliasUseCase):
     def __init__(self, network_port: NetworkPort):

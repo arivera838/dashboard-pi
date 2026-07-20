@@ -87,6 +87,40 @@ class CliDockerController(DockerControllerPort):
                         except Exception:
                             pass
 
+                git_branch = None
+                git_url = None
+                is_managed_app = False
+                labels = item.get("Labels", {})
+                project_name = labels.get("com.docker.compose.project")
+
+                if project_name:
+                    import os, subprocess, pwd, glob
+                    sudo_user = os.environ.get("SUDO_USER")
+                    if sudo_user and sudo_user != "root":
+                        home_dir = f"/home/{sudo_user}"
+                    else:
+                        try:
+                            stat_info = os.stat(__file__)
+                            user_info = pwd.getpwuid(stat_info.st_uid)
+                            if user_info.pw_name != "root":
+                                home_dir = user_info.pw_dir
+                            else:
+                                raise Exception("Owner is root")
+                        except Exception:
+                            home_dirs = [d for d in glob.glob("/home/*") if os.path.isdir(d)]
+                            home_dir = home_dirs[0] if home_dirs else os.path.expanduser("~")
+                            
+                    app_path = os.path.join(home_dir, "apps", project_name)
+                    if os.path.isdir(app_path) and os.path.isdir(os.path.join(app_path, ".git")):
+                        is_managed_app = True
+                        try:
+                            res_b = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=app_path, capture_output=True, text=True)
+                            git_branch = res_b.stdout.strip()
+                            res_u = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=app_path, capture_output=True, text=True)
+                            git_url = res_u.stdout.strip()
+                        except Exception:
+                            pass
+
                 containers.append(DockerContainer(
                     id=cid,
                     name=name,
@@ -94,7 +128,10 @@ class CliDockerController(DockerControllerPort):
                     image=image,
                     running=is_running,
                     ports=ports,
-                    memory_usage=memory_usage
+                    memory_usage=memory_usage,
+                    git_branch=git_branch,
+                    git_url=git_url,
+                    is_managed_app=is_managed_app
                 ))
         except Exception as e:
             print(f"[Docker] Error al parsear JSON de Docker API: {e}")
