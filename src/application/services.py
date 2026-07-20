@@ -21,7 +21,8 @@ from src.application.ports.inputs import (
     SetExternalCameraIpUseCase,
     SaveClientAliasUseCase,
     CancelDeploymentUseCase,
-    GetGitBranchesUseCase
+    GetGitBranchesUseCase,
+    GetLocalAppsUseCase
 )
 from src.application.ports.outputs import (
     SystemMetricsRepositoryPort,
