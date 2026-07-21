@@ -9,13 +9,28 @@ from src.domain.models import WebhookPayload, BuildJob
 from src.application.ports.outputs import GitPort, NotificationPort
 
 class HandleWebhookUseCase:
-    def __init__(self, cicd_manager):
+    def __init__(self, cicd_manager, deployer=None):
         self.cicd_manager = cicd_manager
-        # Secreto de GitHub webhook (opcionalmente configurado vía env)
-        self.secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "").encode('utf-8')
-        self.allowed_branches = ["main", "dev", "stage"]
+        self.deployer = deployer
+        # Leer secreto desde cicd_config.json (con fallback a variable de entorno)
+        self._load_secret()
+
+    def _load_secret(self):
+        """Lee el webhook_secret desde cicd_config.json, con fallback a env var."""
+        try:
+            from src.adapters.outbound.cicd_config import get_cicd_config
+            cfg = get_cicd_config()
+            secret = cfg.get("webhook_secret", "")
+            if not secret:
+                secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+            self.secret = secret.encode('utf-8') if secret else b""
+        except Exception:
+            self.secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "").encode('utf-8')
 
     def execute(self, provider: str, headers: dict, body: bytes) -> tuple[bool, str]:
+        # Recargar secreto en cada ejecución (puede cambiar desde la UI)
+        self._load_secret()
+
         if provider == "github":
             # Validar firma HMAC SHA-256 si hay un secreto configurado
             if self.secret:
@@ -39,16 +54,41 @@ class HandleWebhookUseCase:
                     return True, "Evento ignorado (no es una rama)"
                     
                 branch = ref.replace("refs/heads/", "")
-                if branch not in self.allowed_branches:
-                    return True, f"Rama '{branch}' ignorada. Solo se admiten: {self.allowed_branches}"
-                    
                 repo_name = payload_json.get("repository", {}).get("name", "unknown")
                 repo_url = payload_json.get("repository", {}).get("clone_url", "")
                 commit_hash = payload_json.get("after", "")
                 head_commit = payload_json.get("head_commit") or {}
                 commit_message = head_commit.get("message", "")
                 author = head_commit.get("author", {}).get("username", "unknown")
-                
+
+                # --- Auto-Redeploy: verificar si la rama tiene un despliegue local activo ---
+                if self.deployer:
+                    deployed_apps = self.deployer.get_local_apps()
+                    matching_app = next(
+                        (app for app in deployed_apps
+                         if repo_name in app.get("repo_url", "")
+                         and app.get("current_branch") == branch),
+                        None
+                    )
+
+                    if matching_app:
+                        app_name = matching_app["app_name"]
+                        apps_dir = self.deployer._get_apps_dir()
+                        target_dir = os.path.join(apps_dir, app_name)
+
+                        # Notificar inicio del auto-redeploy
+                        self.cicd_manager.notify.send_notification(
+                            title=f"🔄 Auto-Redeploy: {app_name} ({branch})",
+                            message=f"Push detectado de @{author}\n📝 {commit_message[:100]}\nIniciando pull y reconstrucción..."
+                        )
+
+                        print(f"[CI/CD] Auto-Redeploy disparado para {app_name} (rama {branch}) por push de {author}")
+                        self.deployer.deploy(repo_url, target_dir, app_name, branch)
+                        return True, f"Auto-Redeploy disparado para {app_name} ({branch})"
+                    else:
+                        print(f"[CI/CD] Push recibido para {repo_name}/{branch} pero no hay despliegue local activo.")
+
+                # Fallback: encolar en el CICDManager antiguo si no hay match local
                 payload = WebhookPayload(
                     repo_name=repo_name,
                     repo_url=repo_url,

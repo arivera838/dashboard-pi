@@ -79,7 +79,7 @@ def main():
     git_manager = GitManagerAdapter()
     notification_manager = NotificationManagerAdapter()
     cicd_manager = CICDManager(git_manager, notification_manager)
-    webhook_use_case = HandleWebhookUseCase(cicd_manager)
+    webhook_use_case = HandleWebhookUseCase(cicd_manager, deployer)
 
     cancel_deploy_service = CancelDeploymentService(deployer)
     get_git_branches_service = GetGitBranchesService()

@@ -876,6 +876,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        // --- Estado de despliegues activos para loading en Docker ---
+        let deployingApps = {};  // { appName: status }
+
+        async function checkDeployingApps() {
+            try {
+                const res = await fetch("/api/cicd/deployments");
+                const deployments = await res.json();
+                const prev = Object.keys(deployingApps).length;
+                deployingApps = {};
+                for (const [appName, info] of Object.entries(deployments)) {
+                    if (info.status === "running") {
+                        deployingApps[appName] = info;
+                    }
+                }
+                // Si cambió el estado, refrescar la vista de Docker
+                const curr = Object.keys(deployingApps).length;
+                if (prev !== curr) {
+                    refreshData();
+                }
+            } catch (e) {}
+        }
+        // Polling de despliegues activos cada 5 segundos
+        setInterval(checkDeployingApps, 5000);
+
+        function isAppDeploying(containerName) {
+            // Un contenedor pertenece a una app si su nombre empieza con appName-branch-
+            for (const appName of Object.keys(deployingApps)) {
+                if (containerName.startsWith(appName + "-") || containerName === appName) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         function renderDocker(containers) {
             const tbody = document.getElementById("docker-list");
             if (!containers || containers.length === 0) {
@@ -883,8 +917,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
-            tbody.innerHTML = containers.map(c => `
-                <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
+            tbody.innerHTML = containers.map(c => {
+                const deploying = isAppDeploying(c.name);
+                const rowClass = deploying ? 'border-b border-amber-500/20 bg-amber-500/5 animate-pulse' : 'border-b border-gray-800/30 hover:bg-gray-800/10';
+
+                const statusBadge = deploying
+                    ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                         <i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Desplegando...
+                       </span>`
+                    : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${c.running ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}">
+                         <span class="h-1.5 w-1.5 rounded-full ${c.running ? 'bg-emerald-400' : 'bg-red-400'}"></span>
+                         ${c.running ? 'Corriendo' : 'Detenido'}
+                       </span>`;
+
+                const disabledClass = deploying ? 'opacity-30 pointer-events-none' : '';
+
+                return `
+                <tr class="${rowClass}">
                     <td class="py-3.5 px-4">
                         <div class="font-bold text-gray-200 code-font">${c.name}</div>
                         <div class="text-[10px] text-gray-500 code-font">${c.id}</div>
@@ -896,13 +945,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <td class="py-3.5 px-4 text-xs code-font text-gray-400">${c.ports || '—'}</td>
                     <td class="py-3.5 px-4 text-xs code-font text-emerald-400">${c.memory_usage || 'N/A'}</td>
                     <td class="py-3.5 px-4">
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${c.running ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}">
-                            <span class="h-1.5 w-1.5 rounded-full ${c.running ? 'bg-emerald-400' : 'bg-red-400'}"></span>
-                            ${c.running ? 'Corriendo' : 'Detenido'}
-                        </span>
+                        ${statusBadge}
                     </td>
                     <td class="py-3.5 px-4 text-right">
-                        <div class="flex justify-end gap-1.5">
+                        <div class="flex justify-end gap-1.5 ${disabledClass}">
                             ${c.is_managed_app ? `
                                 <button onclick="redeployContainer('${c.name}')" class="p-1.5 bg-gray-800 hover:bg-indigo-500/15 text-indigo-400 rounded-lg text-xs transition-colors" title="Redesplegar (Pull)">
                                     <i class="fa-solid fa-cloud-arrow-down"></i>
@@ -928,8 +974,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </button>
                         </div>
                     </td>
-                </tr>
-            `).join('');
+                </tr>`;
+            }).join('');
         }
 
         function redeployContainer(appName) {
