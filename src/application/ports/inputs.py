@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 from typing import List
 from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient, RecordingStatus
 
@@ -24,7 +25,7 @@ class GetDockerContainerLogsUseCase(ABC):
 
 class DeployAppUseCase(ABC):
     @abstractmethod
-    def execute(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main") -> DeploymentResult:
+    def execute(self, repo_url: str, target_dir: Optional[str], app_name: str, branch: str = "main") -> DeploymentResult:
         pass
 
 class CancelDeploymentUseCase(ABC):

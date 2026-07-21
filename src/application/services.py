@@ -75,7 +75,7 @@ class DeploymentService(DeployAppUseCase):
     def __init__(self, deployer: DeployerPort):
         self._deployer = deployer
 
-    def execute(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main") -> DeploymentResult:
+    def execute(self, repo_url: str, target_dir: Optional[str], app_name: str, branch: str = "main") -> DeploymentResult:
         success, log = self._deployer.deploy(repo_url, target_dir, app_name, branch)
         message = "¡Despliegue iniciado!" if success else "Error al iniciar el despliegue"
         return DeploymentResult(success=success, log=log, message=message)
@@ -223,7 +223,7 @@ class SaveClientAliasService(SaveClientAliasUseCase):
         return False, "No se pudo guardar el alias para este dispositivo"
 
 class GetGitBranchesService(GetGitBranchesUseCase):
-    def execute(self, repo_url: str) -> tuple[bool, list[str] | str]:
+    def execute(self, repo_url: str) -> tuple[bool, Union[list[str], str]]:
         import subprocess
         try:
             # Ejecutamos git ls-remote sin prompt de contraseña y con timeout de 10s

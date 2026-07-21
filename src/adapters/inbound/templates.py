@@ -721,17 +721,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         }
                     }
                     
-                    const statusClass = app.status === "running" || app.status === "success" 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                        : (app.status === "queued" ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20');
+                    const statusClass = app.status === "running" 
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                        : (app.status === "success" ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : (app.status === "queued" ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'));
                         
-                    const statusLabel = app.status === "running" || app.status === "success" ? "Activo" : (app.status === "queued" ? "En Cola" : "Error");
+                    const statusLabel = app.status === "running" 
+                        ? '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Desplegando...' 
+                        : (app.status === "success" ? "Activo" : (app.status === "queued" ? "En Cola" : "Error"));
+                        
                     const subdomainLink = app.subdomain && app.subdomain !== "—" 
                         ? `<a href="http://${app.subdomain}" target="_blank" class="text-indigo-400 hover:text-indigo-300 underline font-semibold">${app.subdomain}</a>` 
                         : "—";
                         
+                    const rowClass = app.status === "running" ? "bg-amber-500/5 animate-pulse" : "hover:bg-gray-800/10";
+                    
                     return `
-                        <tr class="border-b border-gray-800/30 hover:bg-gray-800/10">
+                        <tr class="border-b border-gray-800/30 ${rowClass}">
                             <td class="py-3.5 px-4 font-bold text-gray-200">${repo}</td>
                             <td class="py-3.5 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">${env}</td>
                             <td class="py-3.5 px-4">
@@ -741,7 +746,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </td>
                             <td class="py-3.5 px-4 text-xs code-font">${subdomainLink}</td>
                             <td class="py-3.5 px-4 text-right">
-                                <button onclick="showDockerLogs('${name}', '${name}')" class="p-1.5 bg-gray-800 hover:bg-sky-500/15 text-gray-400 hover:text-sky-400 rounded-lg text-xs transition-colors" title="Ver Logs">
+                                <button onclick="showDockerLogs('${name}', '${name}')" class="p-1.5 bg-gray-800 hover:bg-sky-500/15 text-gray-400 hover:text-sky-400 rounded-lg text-xs transition-colors" title="Ver Logs" ${app.status === "running" ? "disabled style='opacity: 0.3; cursor: not-allowed;'" : ""}>
                                     <i class="fa-solid fa-file-lines"></i>
                                 </button>
                             </td>
