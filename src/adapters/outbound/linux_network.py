@@ -84,22 +84,48 @@ class LinuxNetworkAdapter(NetworkPort):
         arp_devices: Dict[str, Dict[str, str]] = {}
         arp_path = "/proc/net/arp"
         
-        # Primero leer de /proc/net/arp
-        if os.path.exists(arp_path):
-            try:
-                with open(arp_path, "r") as f:
-                    lines = f.readlines()[1:]
-                    for line in lines:
-                        parts = line.strip().split()
-                        if len(parts) >= 6:
-                            ip = parts[0]
-                            flags = parts[2]
-                            mac = parts[3].lower()
-                            dev = parts[5]
-                            if flags != "0x0" and mac != "00:00:00:00:00:00" and not ip.startswith("127."):
-                                arp_devices[mac] = {"ip": ip, "device": dev}
-            except Exception as e:
-                print(f"[Network] Error al leer tabla ARP: {e}")
+            import sys
+            
+            # Si estamos en macOS, usar `arp -a` en lugar de /proc/net/arp
+            if sys.platform == "darwin":
+                try:
+                    res = subprocess.run(["arp", "-a"], capture_output=True, text=True)
+                    for line in res.stdout.split('\n'):
+                        # arp -a output in macOS looks like:
+                        # ? (192.168.1.1) at 00:11:22:33:44:55 on en0 ifscope [ethernet]
+                        import re
+                        match = re.search(r'\((.*?)\)\s+at\s+(.*?)\s+on\s+(\S+)', line)
+                        if match:
+                            ip = match.group(1)
+                            mac = match.group(2).lower()
+                            dev = match.group(3)
+                            
+                            # Ignorar direcciones multicast y de broadcast
+                            if mac != "ff:ff:ff:ff:ff:ff" and not mac.startswith("01:00:5e") and not mac.startswith("33:33:") and "(incomplete)" not in mac:
+                                # Normalizar MAC de macOS (puede venir como 0:11:22:33:44:55 en lugar de 00:)
+                                mac_parts = [p.zfill(2) for p in mac.split(':')]
+                                if len(mac_parts) == 6:
+                                    mac_normalized = ':'.join(mac_parts)
+                                    arp_devices[mac_normalized] = {"ip": ip, "device": dev}
+                except Exception as e:
+                    print(f"[Network] Error ejecutando arp -a en macOS: {e}")
+            else:
+                # Primero leer de /proc/net/arp (Linux)
+                if os.path.exists(arp_path):
+                    try:
+                        with open(arp_path, "r") as f:
+                            lines = f.readlines()[1:]
+                            for line in lines:
+                                parts = line.strip().split()
+                                if len(parts) >= 6:
+                                    ip = parts[0]
+                                    flags = parts[2]
+                                    mac = parts[3].lower()
+                                    dev = parts[5]
+                                    if flags != "0x0" and mac != "00:00:00:00:00:00" and not ip.startswith("127."):
+                                        arp_devices[mac] = {"ip": ip, "device": dev}
+                    except Exception as e:
+                        print(f"[Network] Error al leer tabla ARP: {e}")
 
         # Integrar cualquier dispositivo que haya detectado arp-scan pero no esté en /proc/net/arp
         for mac, ip in arp_scan_devices.items():
