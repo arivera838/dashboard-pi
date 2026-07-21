@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union
 
 @dataclass(frozen=True)
 class SystemMetrics:
@@ -126,7 +126,7 @@ class RecordingStatus:
     camera_id: str
     is_recording: bool
     recording_time: int
-    file_path: str | None
+    file_path: Optional[str]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -146,8 +146,8 @@ class WebhookPayload:
     commit_message: str
     author: str
     provider: str # github | gitlab
-    signature: str | None = None
-    raw_payload: str | bytes = ""
+    signature: Optional[str] = None
+    raw_payload: Union[str, bytes] = ""
 
 @dataclass
 class BuildJob:
@@ -157,7 +157,7 @@ class BuildJob:
     status: str # queued, building, success, failed
     logs: List[str]
     start_time: float
-    end_time: float | None = None
+    end_time: Optional[float] = None
     
     def to_dict(self) -> Dict[str, Any]:
         return {

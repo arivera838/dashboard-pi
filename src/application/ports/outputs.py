@@ -1,5 +1,6 @@
+from typing import Optional, Union, Dict, Any, List
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Union, List
 from src.domain.models import SystemMetrics, DockerContainer, CameraInfo, WifiClient, RecordingStatus
 
 class SystemMetricsRepositoryPort(ABC):
@@ -35,7 +36,7 @@ class DockerControllerPort(ABC):
 
 class DeployerPort(ABC):
     @abstractmethod
-    def deploy(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main") -> tuple[bool, str]:
+    def deploy(self, repo_url: str, target_dir: Optional[str], app_name: str, branch: str = "main") -> tuple[bool, str]:
         pass
 
     @abstractmethod

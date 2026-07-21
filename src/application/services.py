@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, Union
 from src.domain.models import SystemStatus, DeploymentResult, CameraInfo, WifiClient, RecordingStatus
 from src.application.ports.inputs import (
     GetSystemStatusUseCase,

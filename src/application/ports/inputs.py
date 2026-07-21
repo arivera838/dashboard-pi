@@ -1,3 +1,4 @@
+from typing import Optional, Union, Dict, Any, List
 from abc import ABC, abstractmethod
 from typing import Optional
 from typing import List
@@ -114,5 +115,5 @@ class SaveClientAliasUseCase(ABC):
 
 class GetGitBranchesUseCase(ABC):
     @abstractmethod
-    def execute(self, repo_url: str) -> tuple[bool, list[str] | str]:
+    def execute(self, repo_url: str) -> tuple[bool, Union[list[str], str]]:
         pass

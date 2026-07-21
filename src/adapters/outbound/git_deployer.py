@@ -1,8 +1,9 @@
+from typing import Optional, Union, Dict, Any, List
 import os
 import subprocess
 import threading
 import time
-from typing import Dict
+from typing import Union, Dict
 from src.application.ports.outputs import DeployerPort
 
 class SubprocessDeployer(DeployerPort):
@@ -11,7 +12,7 @@ class SubprocessDeployer(DeployerPort):
     # Diccionario de procesos activos de Git/Docker para cancelación
     _active_processes: Dict[str, subprocess.Popen] = {}
 
-    def deploy(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main") -> tuple[bool, str]:
+    def deploy(self, repo_url: str, target_dir: Optional[str], app_name: str, branch: str = "main") -> tuple[bool, str]:
         # Si ya hay un proceso en ejecución para este app_name, no iniciar otro
         if app_name in self._active_logs and self._active_logs[app_name]["status"] == "running":
             return False, "Ya hay un despliegue en curso para esta aplicación."
@@ -128,7 +129,7 @@ class SubprocessDeployer(DeployerPort):
                     })
         return apps
 
-    def _run_deploy_thread(self, repo_url: str, target_dir: str | None, app_name: str, branch: str = "main"):
+    def _run_deploy_thread(self, repo_url: str, target_dir: Optional[str], app_name: str, branch: str = "main"):
         self._active_logs[app_name] = {
             "status": "running",
             "log": "🚀 [CI/CD] Iniciando pipeline de despliegue...\n",
